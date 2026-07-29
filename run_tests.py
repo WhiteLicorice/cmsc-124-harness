@@ -9,7 +9,7 @@ or sidecar .expected/.exit files). It is identical across every pair and every
 host language -- see manifest.json in each test folder for the per-folder knobs.
 
 Usage:
-    python3 run_tests.py <test-folder> [--run <path-to-run-script>]
+    python3 run_tests.py <test-folder> [--repo-root <path-to-repo-root>]
 
 Exit code of this script itself: 0 if every test in the folder passed, 1 otherwise.
 This is deliberate -- CI can gate on this script's own exit code directly.

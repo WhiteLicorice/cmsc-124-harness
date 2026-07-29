@@ -1,0 +1,7 @@
+# Entrypoints and test fixtures are consumed by bash and by Python on Linux
+# runners. CRLF in a shebang line makes the interpreter unfindable, so keep
+# these LF regardless of the platform they are checked out on.
+* text=auto eol=lf
+*.py text eol=lf
+*.sh text eol=lf
+run text eol=lf
