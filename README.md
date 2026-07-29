@@ -120,6 +120,34 @@ tests/lab1/
   manifest.json
 ```
 
+Nothing here needs registering anywhere. Discovery is recursive, so every file
+matching `ext` anywhere under the folder you point at becomes a test, including
+files in subfolders you invent for your own organization. Expectations are
+paired by filename stem, so `foo.src` looks for `foo.expected` sitting next to
+it. One `manifest.json` at the top of the folder governs everything beneath it.
+Adding your hundredth test case means adding files and nothing else:
+
+```
+tests/lab1/
+  manifest.json
+  keywords.src
+  keywords.expected
+  numbers.src
+  numbers.expected
+  strings/
+    escapes.src
+    escapes.expected
+    unterminated.src
+    unterminated.expected
+    unterminated.exit      <- contains: 65
+```
+
+A test file with no matching `.expected` is reported as a failure rather than
+skipped, so you cannot lose a test case by forgetting its expectation. The
+reverse case, an `.expected` left behind after you renamed or deleted its test,
+is reported as a warning: it does not fail the run, but it does get named, since
+a stale expectation is invisible otherwise.
+
 ### Inline mode (`"mode": "inline"`)
 
 Use this from the interpreter and runtime labs onward, once the *values* your
@@ -142,9 +170,211 @@ Comment syntax is assumed to be `//`. If your invented language uses something
 else for comments, put that lab in sidecar mode instead and route around the
 assumption rather than fighting it.
 
+### Which mode to reach for
+
+Inline mode is the better default wherever it fits, and it is what *Crafting
+Interpreters* does. One file is one test case: the program, the output it should
+produce, and the exit code it should end on all sit together, so a reviewer sees
+the whole claim at once and your commit history shows one new file per new test
+instead of two or three.
+
+Sidecar mode earns its place in exactly one situation, and it is worth
+understanding why before you pick a mode for the scanner lab. If your output
+reports line numbers, the `// expect:` comments are themselves lines in the
+file, and they push the code below them further down. Given this test:
+
+```
+var x
+// expect: TOKEN(var, line=1)
+// expect: TOKEN(x, line=1)
+var y
+// expect: TOKEN(var, line=4)
+// expect: TOKEN(y, line=4)
+```
+
+`var y` is on line 4, not line 2, because two comments sit above it. Writing the
+intuitive `line=2` produces a genuine mismatch:
+
+```
+       stdout mismatch:
+       --- expected
+       +++ actual
+       -TOKEN(var, line=2)
+       +TOKEN(var, line=4)
+```
+
+Your scanner is right and your test is wrong, which is a miserable way to spend
+an afternoon. Sidecar mode keeps expectations out of the source file entirely, so
+line numbers stay where you wrote them. That is why the scanner lab uses it and
+the later labs, whose output is values rather than positions, do not.
+
 ---
 
-## 5. Fast way to verify the harness works before you trust it
+## 5. A worked example, start to finish
+
+Here is a complete repository, small enough to read in one sitting, that goes
+from nothing to a passing run. Say your group invented a language called `mila`
+and chose Go as the host.
+
+Start with the two scripts the run contract asks for. `build.sh` compiles your
+interpreter once:
+
+```bash
+#!/usr/bin/env bash
+# build.sh
+set -e
+mkdir -p build
+go build -o build/interpreter ./cmd/interpreter
+```
+
+`run` executes what `build.sh` produced, forwarding its arguments:
+
+```bash
+#!/usr/bin/env bash
+# run
+exec ./build/interpreter "$@"
+```
+
+Mark both executable, or nothing downstream works:
+
+```bash
+chmod +x build.sh run
+```
+
+Now declare your conventions. Your source files end in `.mila`, and for the
+scanner lab you want expectations kept out of the source, so:
+
+```json
+{
+  "ext": ".mila",
+  "mode": "sidecar"
+}
+```
+
+Save that as `tests/lab1/manifest.json`. The fields you left out keep their
+defaults, which is why `run_entrypoint` and the rest are absent.
+
+Write your first test. `tests/lab1/keywords.mila` holds a program in your own
+syntax:
+
+```
+var greeting = "hello"
+print greeting
+```
+
+Run your interpreter on it once by hand, look hard at the output, and decide
+whether it is what you actually meant. Once you believe it, that output becomes
+`tests/lab1/keywords.expected`:
+
+```
+TOKEN(VAR, "var", line=1)
+TOKEN(IDENTIFIER, "greeting", line=1)
+TOKEN(EQUAL, "=", line=1)
+TOKEN(STRING, "hello", line=1)
+TOKEN(PRINT, "print", line=2)
+TOKEN(IDENTIFIER, "greeting", line=2)
+TOKEN(EOF, "", line=2)
+```
+
+This test expects a clean exit, so it needs no `.exit` file. The tree so far:
+
+```
+build.sh
+run
+go.mod
+cmd/interpreter/main.go
+tests/lab1/
+  manifest.json
+  keywords.mila
+  keywords.expected
+```
+
+Run it the way CI will:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/WhiteLicorice/cmsc-124-harness/v1.0/run_tests.py -o run_tests.py
+./build.sh
+python3 run_tests.py tests/lab1
+```
+
+```
+[PASS] tests/lab1/keywords.mila
+
+1/1 tests passed.
+```
+
+Now add a test for input your scanner should reject. `tests/lab1/unterminated.mila`
+holds a string with no closing quote:
+
+```
+var broken = "no closing quote
+```
+
+Your scanner should report the problem on stderr and exit 65, so
+`tests/lab1/unterminated.expected` is empty (nothing legitimate reached stdout)
+and `tests/lab1/unterminated.exit` contains one line:
+
+```
+65
+```
+
+You added a test case by adding files. No list to update, no registration step:
+
+```
+python3 run_tests.py tests/lab1
+```
+
+```
+[PASS] tests/lab1/keywords.mila
+[PASS] tests/lab1/unterminated.mila
+
+2/2 tests passed.
+```
+
+When something does break, you get the diff rather than a bare failure. Suppose
+you refactor your scanner and it starts emitting `STR` where it used to emit
+`STRING`:
+
+```
+[PASS] tests/lab1/keywords.mila
+[FAIL] tests/lab1/unterminated.mila
+       exit code: expected 65, got 70
+       (stderr was: panic: index out of range)
+
+1/2 tests passed.
+```
+
+That tells you the refactor turned a clean rejection into a crash, which is a
+real regression and precisely what the committed expectations are for.
+
+Later, once you are past the scanner and your tests are about computed values
+rather than token positions, switch that lab's folder to inline mode. The
+manifest becomes:
+
+```json
+{
+  "ext": ".mila",
+  "mode": "inline"
+}
+```
+
+And a whole test case is one file, `tests/lab3/arithmetic.mila`:
+
+```
+print 3 + 4
+// expect: 7
+print 2 * 5
+// expect: 10
+print 1 / 0
+// expect runtime error: Division by zero.
+```
+
+That last line also asserts the exit code is 70, since a runtime error is
+expected. Nothing else needs to exist for that test.
+
+---
+
+## 6. Fast way to verify the harness works before you trust it
 
 Do not take `run_tests.py` on faith. Run the bundled self-test, which exercises
 both modes and, more importantly, confirms that the script actually *fails* a
@@ -174,18 +404,18 @@ shape at once than assemble it from this README.
 
 ---
 
-## 6. Versioning
+## 7. Versioning
 
 - `main` is active development. Do not point your CI at this branch.
 - Tags (`v1.0`, `v1.1`, and so on) are what groups pin to. They get bumped and
   announced on the course Messenger channel, with a changelog entry, whenever
   the harness changes mid-semester.
 
-## 7. Repo layout
+## 8. Repo layout
 
 ```
 run_tests.py                       <- the only file groups actually fetch
-selftest.sh                        <- fast correctness check for this repo itself
+selftest.sh                        <- six-check correctness gate for this repo itself
 .github/workflows/selftest.yml     <- runs selftest.sh in CI on every push
 examples/
   sidecar-mode/

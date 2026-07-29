@@ -332,6 +332,27 @@ def run_single_test(test_file: Path, manifest: dict, repo_root: Path) -> TestRes
     return TestResult(name, True)
 
 
+def find_orphaned_expectations(folder: Path, test_files, repo_root: Path):
+    """
+    Returns .expected and .exit files that have no test file to pair with.
+
+    Pairing is by filename stem, so renaming a test without renaming its
+    expectation leaves the old expectation behind, silently unused. That is
+    exactly the kind of thing nobody notices in a passing run, so it gets
+    reported.
+    """
+    test_stems = {t.parent / t.stem for t in test_files}
+    orphans = []
+    for suffix in (".expected", ".exit"):
+        for candidate in sorted(folder.rglob(f"*{suffix}")):
+            if candidate.parent / candidate.stem not in test_stems:
+                try:
+                    orphans.append(str(candidate.relative_to(repo_root)))
+                except ValueError:
+                    orphans.append(str(candidate))
+    return orphans
+
+
 def main():
     parser = argparse.ArgumentParser(description="CMSC 124 language-agnostic test runner.")
     parser.add_argument("test_folder", help="Path to the folder of test files, e.g. tests/lab1")
@@ -355,6 +376,14 @@ def main():
     if not test_files:
         print(f"ERROR: no test files with extension '{manifest['ext']}' found under '{test_folder}'.", file=sys.stderr)
         sys.exit(1)
+
+    if manifest["mode"] == "sidecar":
+        for orphan in find_orphaned_expectations(test_folder, test_files, repo_root):
+            print(
+                f"WARNING: '{orphan}' pairs with no {manifest['ext']} test file. "
+                "Left over from a rename?",
+                file=sys.stderr,
+            )
 
     summary = Summary()
     for test_file in test_files:

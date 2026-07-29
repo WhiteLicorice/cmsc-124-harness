@@ -75,6 +75,50 @@ fi
 rm -rf "$TMP_PY"
 
 echo
+echo "== 5. orphaned .expected file (expect: a warning, but still PASS) =="
+TMP_ORPHAN="$(mktemp -d)"
+mkdir -p "$TMP_ORPHAN/tests/lab0"
+cp "$SCRIPT_DIR/examples/sidecar-mode/run" "$TMP_ORPHAN/run"
+chmod +x "$TMP_ORPHAN/run"
+echo "kept" > "$TMP_ORPHAN/tests/lab0/kept.src"
+echo "kept" > "$TMP_ORPHAN/tests/lab0/kept.expected"
+echo "stale" > "$TMP_ORPHAN/tests/lab0/renamed_away.expected"
+cd "$TMP_ORPHAN" || exit 1
+if python3 "$SCRIPT_DIR/run_tests.py" tests/lab0 > /tmp/selftest_out_5.txt 2>&1 &&
+   grep -q "renamed_away.expected" /tmp/selftest_out_5.txt; then
+  pass "orphaned expectation was reported without failing the run"
+else
+  fail "an orphaned .expected file should warn while the real test still passes"
+  cat /tmp/selftest_out_5.txt
+fi
+rm -rf "$TMP_ORPHAN"
+
+echo
+echo "== 6. non-zero .exit with empty .expected (expect: PASS) =="
+TMP_EXIT="$(mktemp -d)"
+mkdir -p "$TMP_EXIT/tests/lab1"
+cat > "$TMP_EXIT/run" <<'RUNEOF'
+#!/usr/bin/env bash
+# Stands in for an interpreter rejecting a file: diagnostics on stderr, exit 65.
+set -e
+echo "[line 1] Error: Unterminated string." >&2
+exit 65
+RUNEOF
+chmod +x "$TMP_EXIT/run"
+echo '{"ext": ".src", "mode": "sidecar"}' > "$TMP_EXIT/tests/lab1/manifest.json"
+echo 'var broken = "no closing quote' > "$TMP_EXIT/tests/lab1/unterminated.src"
+: > "$TMP_EXIT/tests/lab1/unterminated.expected"
+echo "65" > "$TMP_EXIT/tests/lab1/unterminated.exit"
+cd "$TMP_EXIT" || exit 1
+if python3 "$SCRIPT_DIR/run_tests.py" tests/lab1 > /tmp/selftest_out_6.txt 2>&1; then
+  pass "static-error test matched its .exit file and empty .expected"
+else
+  fail "a test with .exit 65 and empty .expected should have passed"
+  cat /tmp/selftest_out_6.txt
+fi
+rm -rf "$TMP_EXIT"
+
+echo
 if [ "$FAILURES" -eq 0 ]; then
   echo "All self-checks behaved as expected. run_tests.py is working correctly."
   exit 0
