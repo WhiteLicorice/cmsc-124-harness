@@ -1,0 +1,6 @@
+{
+  "ext": ".src",
+  "flag": null,
+  "mode": "inline",
+  "run_entrypoint": "./run"
+}

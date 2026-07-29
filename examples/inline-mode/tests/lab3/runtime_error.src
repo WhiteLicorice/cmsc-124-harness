@@ -1,0 +1,4 @@
+PRINT before
+// expect: before
+1 DIVZERO 0
+// expect runtime error: Runtime error: division by zero.

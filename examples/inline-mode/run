@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Toy "interpreter" for a made-up language where:
+#   PRINT <text>   -> prints <text> to stdout
+#   DIVZERO        -> triggers a simulated runtime error, exit 70
+# A real pair's ./run would actually lex/parse/execute instead of pattern-matching lines.
+set -e
+while IFS= read -r line; do
+  if [[ "$line" == PRINT\ * ]]; then
+    echo "${line#PRINT }"
+  elif [[ "$line" == *DIVZERO* ]]; then
+    echo "Runtime error: division by zero." >&2
+    exit 70
+  fi
+done < "$1"
+exit 0

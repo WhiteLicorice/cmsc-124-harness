@@ -1,0 +1,11 @@
+name: selftest
+on:
+  push:
+  pull_request:
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: chmod +x selftest.sh examples/sidecar-mode/run examples/inline-mode/run
+      - run: ./selftest.sh

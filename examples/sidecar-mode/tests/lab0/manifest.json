@@ -1,0 +1,6 @@
+{
+  "ext": ".src",
+  "flag": null,
+  "mode": "sidecar",
+  "run_entrypoint": "./run"
+}

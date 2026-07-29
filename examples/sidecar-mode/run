@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Toy "interpreter" standing in for a real pair's ./run entrypoint.
+# Just echoes the file's contents -- real interpreters would actually
+# lex/parse/execute the source file instead.
+set -e
+cat "$1"
