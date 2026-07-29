@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-cmsc124-grader: a language-agnostic test runner for CMSC 124 laboratory activities.
+cmsc-124-harness: a language-agnostic test runner for CMSC 124 laboratory activities.
 
 This script never parses a pair's grammar. It only ever invokes the pair's own
 `./run` entrypoint on committed test files, then diffs stdout + exit code against
@@ -167,7 +167,7 @@ def build_launch_command(run_entrypoint: str, repo_root: Path):
         if not bash:
             return None, (
                 "ERROR: this looks like a shell script, and Windows cannot run one without bash.\n"
-                "Install Git for Windows (it ships bash), or run the grader from WSL."
+                "Install Git for Windows (it ships bash), or run this harness from WSL."
             )
         return [bash, run_entrypoint], None
 

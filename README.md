@@ -1,4 +1,4 @@
-# cmsc124-grader
+# cmsc-124-harness
 
 A single, language-agnostic test runner (`run_tests.py`) shared by every pair in
 CMSC 124, regardless of which host language or invented syntax they're using.
@@ -19,11 +19,11 @@ directly in CI (this is what the CI wiring in the Lab 0 manual already does for
 every language):
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/WhiteLicorice/cmsc124-grader/v1.0/run_tests.py -o run_tests.py
+curl -sSL https://raw.githubusercontent.com/WhiteLicorice/cmsc-124-harness/v1.0/run_tests.py -o run_tests.py
 python3 run_tests.py tests/lab0
 ```
 
-**Why a pinned tag (`v1.0`) and not `main`:** if the grader gets a bugfix
+**Why a pinned tag (`v1.0`) and not `main`:** if the harness gets a bugfix
 mid-semester, that fix should not retroactively change what "passing" meant for
 a defense you already completed. When the instructor bumps the tag, it'll be
 announced on the course Messenger channel along with a changelog entry — update
@@ -33,7 +33,7 @@ You can also just download `run_tests.py` locally to run it on your own machine
 before pushing, exactly as CI would:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/WhiteLicorice/cmsc124-grader/v1.0/run_tests.py -o run_tests.py
+curl -sSL https://raw.githubusercontent.com/WhiteLicorice/cmsc-124-harness/v1.0/run_tests.py -o run_tests.py
 python3 run_tests.py tests/lab1
 ```
 
@@ -41,7 +41,7 @@ Requires Python 3.8+ and nothing else (standard library only — no `pip install
 needed).
 
 Windows, Linux, and macOS are all supported. Windows cannot execute a file
-with a shebang line, so on Windows the grader reads your entrypoint's shebang
+with a shebang line, so on Windows the harness reads your entrypoint's shebang
 and names the interpreter itself: a `run` starting with `#!/usr/bin/env bash`
 gets launched as `bash run`, using the bash that Git for Windows installs. You
 do not have to do anything for this, and you do not need WSL. If your `run` is
@@ -92,7 +92,7 @@ Every field is optional; any you omit fall back to these defaults:
 | `run_entrypoint` | Path to your run script, if not `./run` at the repo root. |
 
 Different lab folders can use different manifests (e.g. `tests/lab1/` in
-sidecar mode, `tests/lab3/` in inline mode) — the grader reads whichever
+sidecar mode, `tests/lab3/` in inline mode) — the harness reads whichever
 `manifest.json` sits in the folder you point it at.
 
 ---
@@ -141,11 +141,11 @@ PRINT 3 + 4
 
 Comment syntax is assumed to be `//`. If your invented language doesn't use
 `//` for comments, use sidecar mode instead for that lab — don't fight the
-grader's assumption, route around it.
+harness's assumption, route around it.
 
 ---
 
-## 5. Fast way to verify the grader works before you trust it
+## 5. Fast way to verify the harness works before you trust it
 
 Don't take `run_tests.py`'s correctness on faith — run the bundled self-test,
 which exercises both modes and, critically, checks that the script actually
@@ -153,8 +153,8 @@ which exercises both modes and, critically, checks that the script actually
 pass):
 
 ```bash
-git clone https://github.com/WhiteLicorice/cmsc124-grader.git
-cd cmsc124-grader
+git clone https://github.com/WhiteLicorice/cmsc-124-harness.git
+cd cmsc-124-harness
 ./selftest.sh
 ```
 
@@ -181,7 +181,7 @@ whole shape end to end rather than piecing it together from this README.
 
 - `main` — active development; **do not** point your CI at this branch.
 - Tags (`v1.0`, `v1.1`, ...) — what pairs actually pin to. Bumped and announced
-  via the course Messenger channel with a changelog entry when the grader
+  via the course Messenger channel with a changelog entry when the harness
   changes mid-semester.
 
 ## 7. Repo layout
