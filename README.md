@@ -1,21 +1,20 @@
 # cmsc-124-harness
 
-One language-agnostic test runner, `run_tests.py`, shared by every group in
-CMSC 124 no matter which host language they picked or what syntax they invented.
+A language-agnostic test runner shared by every group in
+CMSC 124 Laboratory no matter which host language they picked or what syntax they invented.
 
 It does not parse anyone's grammar, know anyone's token vocabulary, or contain
 anything specific to one language. All it ever does is call your own `./run`
 entrypoint on the test files you committed, then compare stdout and the exit
 code against the expectations you committed alongside them. The same script,
-with no edits, covers every lab and every language in the course pool: Rust,
-Kotlin, Dart, C#, C++, Go, and Julia.
+with no edits, covers every lab and every language in the course pool.
 
 ---
 
 ## 1. How your group fetches this
 
 Do not vendor this repository into your own, and do not add it as a submodule.
-Fetch the pinned script in CI, which is what the CI wiring in the Lab 0 manual
+Fetch the pinned script in CI, which is what the CI wiring in the Laboratory Activity 0 manual
 already does for every language:
 
 ```bash
@@ -26,7 +25,7 @@ python3 run_tests.py tests/lab0
 The URL names a tag rather than `main` on purpose. If the harness picks up a
 bugfix halfway through the semester, that fix should not retroactively change
 what passing meant for a defense you already finished. When the instructor
-bumps the tag, it gets announced on the course Messenger channel with a
+bumps the tag, it gets announced through channels with a
 changelog entry. Update the tag in your own workflow only when you are told to.
 
 You can also download `run_tests.py` and run it on your own machine before
@@ -38,13 +37,13 @@ python3 run_tests.py tests/lab1
 ```
 
 It needs Python 3.8 or newer and nothing else. Standard library only, so there
-is no `pip install` step.
+is no `pip install` step, no `venv` requirements.
 
 Windows, Linux, and macOS all work. Windows cannot execute a file whose
 executability comes from a shebang line, so on Windows the harness reads that
 line and names the interpreter itself: a `run` beginning with
 `#!/usr/bin/env bash` gets launched as `bash run`, using the bash that Git for
-Windows installs. This needs nothing from you, and it does not need WSL. A
+Windows installs (Git for Windows is a course requirement). This needs nothing from you, and it does not need WSL. A
 native `.exe`, `.bat`, or `.cmd` entrypoint is launched directly.
 
 Your entrypoint always receives the test file as a repo-relative path with
@@ -86,7 +85,7 @@ Every field is optional. Anything you leave out falls back to these defaults:
 | Field | Meaning |
 |---|---|
 | `ext` | Extension of your test and source files under this folder, e.g. `.src`, `.lox`, `.mylang`. |
-| `flag` | Optional CLI flag passed to `./run` before the file path, e.g. `--tokenize` for Lab 1's scanner stage. `null` for plain execution. |
+| `flag` | Optional CLI flag passed to `./run` before the file path, e.g. `--tokenize` for Laboratory Activity 1's scanner stage. `null` for plain execution. |
 | `mode` | `"sidecar"` or `"inline"`. See §4. |
 | `expect_prefix` / `expect_error_prefix` / `expect_compile_error_prefix` | Used in `"inline"` mode only: the comment prefixes your test files use. The defaults match the *Crafting Interpreters* convention exactly. |
 | `run_entrypoint` | Path to your run script, if it is not `./run` at the repo root. |
@@ -103,7 +102,7 @@ sidecar mode while `tests/lab3/` is in inline mode. The harness reads whichever
 
 Use this whenever your output depends on your own syntax and there is no
 external oracle to compare it against. The canonical case is the Scanner in
-Lab 1, where the token type names are vocabulary you invented. Checking here is
+Laboratory Activity 1, where the token type names are vocabulary you invented. Checking here is
 a **regression check**: your output today against the output your own group
 committed earlier, not a comparison with anyone else's answer.
 
