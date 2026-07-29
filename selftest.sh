@@ -58,6 +58,23 @@ fi
 rm -rf "$TMP_BROKEN"
 
 echo
+echo "== 4. python entrypoint instead of a shell one (expect: PASS) =="
+TMP_PY="$(mktemp -d)"
+mkdir -p "$TMP_PY/tests/lab0"
+printf '#!/usr/bin/env python3\nimport sys\nprint(open(sys.argv[1]).read(), end="")\n' > "$TMP_PY/run"
+chmod +x "$TMP_PY/run"
+echo "python entrypoint works" > "$TMP_PY/tests/lab0/hello.src"
+echo "python entrypoint works" > "$TMP_PY/tests/lab0/hello.expected"
+cd "$TMP_PY" || exit 1
+if python3 "$SCRIPT_DIR/run_tests.py" tests/lab0 > /tmp/selftest_out_4.txt 2>&1; then
+  pass "python entrypoint launched correctly"
+else
+  fail "python entrypoint should have passed but didn't -- check interpreter resolution"
+  cat /tmp/selftest_out_4.txt
+fi
+rm -rf "$TMP_PY"
+
+echo
 if [ "$FAILURES" -eq 0 ]; then
   echo "All self-checks behaved as expected. run_tests.py is working correctly."
   exit 0

@@ -40,6 +40,16 @@ python3 run_tests.py tests/lab1
 Requires Python 3.8+ and nothing else (standard library only — no `pip install`
 needed).
 
+Windows, Linux, and macOS are all supported. Windows cannot execute a file
+with a shebang line, so on Windows the grader reads your entrypoint's shebang
+and names the interpreter itself: a `run` starting with `#!/usr/bin/env bash`
+gets launched as `bash run`, using the bash that Git for Windows installs. You
+do not have to do anything for this, and you do not need WSL. If your `run` is
+a native `.exe`, `.bat`, or `.cmd`, it is launched directly.
+
+Your entrypoint always receives the test file as a repo-relative path with
+forward slashes, so shell scripts do not have to deal with backslashes.
+
 ---
 
 ## 2. What your repo needs to provide

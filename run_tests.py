@@ -18,11 +18,26 @@ This is deliberate -- CI can gate on this script's own exit code directly.
 import argparse
 import difflib
 import json
+import os
 import re
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+
+IS_WINDOWS = os.name == "nt"
+
+# Extensions Windows can hand to CreateProcess directly. Anything else is a
+# script that needs its interpreter named explicitly.
+WINDOWS_NATIVE_SUFFIXES = {".exe", ".com", ".bat", ".cmd"}
+
+# Where Git for Windows puts bash when its bin directory is not on PATH, which
+# is the default for the "Git from the command line" install option.
+WINDOWS_BASH_FALLBACKS = (
+    r"C:\Program Files\Git\bin\bash.exe",
+    r"C:\Program Files (x86)\Git\bin\bash.exe",
+)
 
 DEFAULT_MANIFEST = {
     # Extension of source files under this folder that count as test cases.
@@ -91,11 +106,100 @@ def find_test_files(folder: Path, ext: str):
     return sorted(folder.rglob(f"*{ext}"))
 
 
+def find_windows_bash():
+    """Locates a bash Windows can execute, or returns None."""
+    found = shutil.which("bash")
+    if found:
+        return found
+    for candidate in WINDOWS_BASH_FALLBACKS:
+        if Path(candidate).exists():
+            return candidate
+    return None
+
+
+def read_shebang_interpreter(script: Path):
+    """
+    Returns the interpreter named on a script's shebang line, e.g. "bash" for
+    both `#!/bin/bash` and `#!/usr/bin/env bash`. Returns None when the file has
+    no shebang or cannot be read as text.
+    """
+    try:
+        with open(script, "rb") as f:
+            first_line = f.readline(256).decode("utf-8", errors="replace")
+    except OSError:
+        return None
+
+    if not first_line.startswith("#!"):
+        return None
+
+    parts = first_line[2:].strip().split()
+    if not parts:
+        return None
+
+    interpreter = Path(parts[0].replace("\\", "/")).name
+    if interpreter == "env" and len(parts) > 1:
+        interpreter = Path(parts[1].replace("\\", "/")).name
+    return interpreter
+
+
+def build_launch_command(run_entrypoint: str, repo_root: Path):
+    """
+    Turns a pair's run entrypoint into an argv prefix the host OS can actually
+    execute, and returns (argv_prefix, error_message).
+
+    On Linux and macOS the entrypoint runs directly, exactly as the run contract
+    describes. Windows cannot execute a file with a shebang line, so the
+    interpreter has to be named explicitly: `run` becomes `bash run`. Without
+    this, every pair working on native Windows gets WinError 193 instead of test
+    results, even though their entrypoint is perfectly correct.
+    """
+    if not IS_WINDOWS:
+        return [run_entrypoint], None
+
+    entrypoint_path = (repo_root / run_entrypoint).resolve()
+    if entrypoint_path.suffix.lower() in WINDOWS_NATIVE_SUFFIXES:
+        return [run_entrypoint], None
+
+    interpreter = read_shebang_interpreter(entrypoint_path) or "bash"
+
+    if interpreter in ("bash", "sh", "dash", "zsh"):
+        bash = find_windows_bash()
+        if not bash:
+            return None, (
+                "ERROR: this looks like a shell script, and Windows cannot run one without bash.\n"
+                "Install Git for Windows (it ships bash), or run the grader from WSL."
+            )
+        return [bash, run_entrypoint], None
+
+    if interpreter.startswith("python"):
+        return [sys.executable, run_entrypoint], None
+
+    resolved = shutil.which(interpreter)
+    if not resolved:
+        return None, (
+            f"ERROR: '{run_entrypoint}' asks for interpreter '{interpreter}', "
+            "which is not on PATH on this machine."
+        )
+    return [resolved, run_entrypoint], None
+
+
 def run_program(run_entrypoint: str, flag, test_file: Path, repo_root: Path):
-    cmd = [run_entrypoint]
+    cmd, error = build_launch_command(run_entrypoint, repo_root)
+    if error:
+        return "", error, -1
+
     if flag:
         cmd.append(flag)
-    cmd.append(str(test_file))
+
+    # Hand the entrypoint a repo-relative POSIX path. Absolute Windows paths
+    # with backslashes do not survive being passed into a shell script, and
+    # relative paths keep failure output identical on every platform.
+    try:
+        test_argument = test_file.resolve().relative_to(repo_root).as_posix()
+    except ValueError:
+        test_argument = str(test_file)
+    cmd.append(test_argument)
+
     try:
         proc = subprocess.run(
             cmd,
@@ -109,6 +213,8 @@ def run_program(run_entrypoint: str, flag, test_file: Path, repo_root: Path):
         return "", "TIMEOUT: process exceeded 15s", -1
     except FileNotFoundError:
         return "", f"ERROR: could not execute '{run_entrypoint}' -- is it committed and chmod +x?", -1
+    except OSError as exc:
+        return "", f"ERROR: could not execute '{run_entrypoint}' -- {exc}", -1
 
 
 def parse_inline_expectations(test_file: Path, manifest: dict):
