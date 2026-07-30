@@ -119,6 +119,43 @@ fi
 rm -rf "$TMP_EXIT"
 
 echo
+echo "== 7. inline mode with non-// comment syntax (expect: PASS) =="
+TMP_COMMENT="$(mktemp -d)"
+mkdir -p "$TMP_COMMENT/tests/lab3"
+cp "$SCRIPT_DIR/examples/inline-mode/run" "$TMP_COMMENT/run"
+chmod +x "$TMP_COMMENT/run"
+printf '{"ext": ".src", "mode": "inline", "comment_prefix": ["#", "--"]}\n' \
+  > "$TMP_COMMENT/tests/lab3/manifest.json"
+printf 'PRINT 7\n# expect: 7\nPRINT 8\n-- expect: 8\n' > "$TMP_COMMENT/tests/lab3/hash.src"
+cd "$TMP_COMMENT" || exit 1
+if python3 "$SCRIPT_DIR/run_tests.py" tests/lab3 > /tmp/selftest_out_7.txt 2>&1; then
+  pass "a language using # and -- for comments works in inline mode"
+else
+  fail "configurable comment_prefix should have matched # and -- annotations"
+  cat /tmp/selftest_out_7.txt
+fi
+rm -rf "$TMP_COMMENT"
+
+echo
+echo "== 8. inline mode with no comment_prefix (expect: clean error, not a traceback) =="
+TMP_NOPREFIX="$(mktemp -d)"
+mkdir -p "$TMP_NOPREFIX/tests/lab3"
+cp "$SCRIPT_DIR/examples/inline-mode/run" "$TMP_NOPREFIX/run"
+chmod +x "$TMP_NOPREFIX/run"
+printf '{"ext": ".src", "mode": "inline", "comment_prefix": ""}\n' \
+  > "$TMP_NOPREFIX/tests/lab3/manifest.json"
+printf 'PRINT 7\n' > "$TMP_NOPREFIX/tests/lab3/a.src"
+cd "$TMP_NOPREFIX" || exit 1
+python3 "$SCRIPT_DIR/run_tests.py" tests/lab3 > /tmp/selftest_out_8.txt 2>&1
+if grep -q "comment_prefix" /tmp/selftest_out_8.txt && ! grep -q "Traceback" /tmp/selftest_out_8.txt; then
+  pass "an empty comment_prefix is reported as a configuration error"
+else
+  fail "an empty comment_prefix should produce a readable error, not a traceback"
+  cat /tmp/selftest_out_8.txt
+fi
+rm -rf "$TMP_NOPREFIX"
+
+echo
 if [ "$FAILURES" -eq 0 ]; then
   echo "All self-checks behaved as expected. run_tests.py is working correctly."
   exit 0

@@ -78,6 +78,8 @@ Every field is optional. Anything you leave out falls back to these defaults:
   "expect_prefix": "expect:",
   "expect_error_prefix": "expect runtime error:",
   "expect_compile_error_prefix": "expect error:",
+  "comment_prefix": "//",
+  "comment_suffix": null,
   "run_entrypoint": "./run"
 }
 ```
@@ -87,7 +89,9 @@ Every field is optional. Anything you leave out falls back to these defaults:
 | `ext` | Extension of your test and source files under this folder, e.g. `.src`, `.lox`, `.mylang`. |
 | `flag` | Optional CLI flag passed to `./run` before the file path, e.g. `--tokenize` for Laboratory Activity 1's scanner stage. `null` for plain execution. |
 | `mode` | `"sidecar"` or `"inline"`. See §4. |
-| `expect_prefix` / `expect_error_prefix` / `expect_compile_error_prefix` | Used in `"inline"` mode only: the comment prefixes your test files use. The defaults match the *Crafting Interpreters* convention exactly. |
+| `expect_prefix` / `expect_error_prefix` / `expect_compile_error_prefix` | Used in `"inline"` mode only: the annotation prefixes your test files use, written inside a comment. The defaults match the *Crafting Interpreters* convention exactly. |
+| `comment_prefix` | Used in `"inline"` mode only: how a comment starts in the language you invented. One token, or a list if your language has several. |
+| `comment_suffix` | Used in `"inline"` mode only: how a comment ends, for bracketed comments such as `(* ... *)`. `null` when comments run to end of line. |
 | `run_entrypoint` | Path to your run script, if it is not `./run` at the repo root. |
 
 Different lab folders can use different manifests, so `tests/lab1/` might be in
@@ -166,9 +170,50 @@ PRINT 3 + 4
 - `// expect error: <message>` does the same but expects exit code 65, for
   static errors caught before execution starts.
 
-Comment syntax is assumed to be `//`. If your invented language uses something
-else for comments, put that lab in sidecar mode instead and route around the
-assumption rather than fighting it.
+Annotations live in comments, so the harness has to know what a comment looks
+like in the language you invented. It defaults to `//`, and you override it with
+`comment_prefix`. A language using `#`:
+
+```json
+{
+  "ext": ".mila",
+  "mode": "inline",
+  "comment_prefix": "#"
+}
+```
+
+```
+print 3 + 4
+# expect: 7
+```
+
+If your language has more than one comment token, list them all. Tokens are
+matched literally and longest first, so a `//` token cannot shadow a `///` one:
+
+```json
+{
+  "comment_prefix": ["#", "--"]
+}
+```
+
+If your comments are bracketed rather than running to end of line, name the
+closing token too and it gets stripped off the annotation:
+
+```json
+{
+  "comment_prefix": "(*",
+  "comment_suffix": "*)"
+}
+```
+
+```
+print 3 + 4
+(* expect: 7 *)
+```
+
+There is no comment syntax that forces you out of inline mode. If you set
+`comment_prefix` to nothing at all, the harness stops with a configuration
+error rather than silently treating every line as an annotation.
 
 ### Which mode to reach for
 
@@ -178,10 +223,11 @@ produce, and the exit code it should end on all sit together, so a reviewer sees
 the whole claim at once and your commit history shows one new file per new test
 instead of two or three.
 
-Sidecar mode earns its place in exactly one situation, and it is worth
-understanding why before you pick a mode for the scanner lab. If your output
-reports line numbers, the `// expect:` comments are themselves lines in the
-file, and they push the code below them further down. Given this test:
+Sidecar mode earns its place when your expected output reports positions in the
+source, which in practice means the scanner lab. The reason is worth
+understanding before you choose, because it is not obvious. Annotation comments
+are themselves lines in the file, so they push the code below them further down.
+Given this test:
 
 ```
 var x
@@ -205,8 +251,21 @@ intuitive `line=2` produces a genuine mismatch:
 
 Your scanner is right and your test is wrong, which is a miserable way to spend
 an afternoon. Sidecar mode keeps expectations out of the source file entirely, so
-line numbers stay where you wrote them. That is why the scanner lab uses it and
-the later labs, whose output is values rather than positions, do not.
+line numbers stay where you wrote them.
+
+You can dodge the problem in inline mode by putting the annotation at the end of
+the line it describes, since a trailing comment adds no lines of its own:
+
+```
+print 3 + 4   // expect: 7
+```
+
+That works cleanly when one source line produces exactly one line of output. A
+scanner emits a token per lexeme, so a single line of source becomes several
+lines of output, and once you need more annotations than you have source lines
+the shifting comes back. Hence the split: sidecar for the
+scanner, inline for the labs after it, where output is values rather than
+positions.
 
 ---
 

@@ -53,6 +53,12 @@ DEFAULT_MANIFEST = {
     "expect_prefix": "expect:",
     "expect_error_prefix": "expect runtime error:",
     "expect_compile_error_prefix": "expect error:",
+    # Only used when mode == "inline": how a comment starts, and optionally
+    # ends, in the pair's own invented language. Either field accepts one token
+    # or a list of them. A suffix is only needed for bracketed comments, where
+    # it gets stripped off the end of the annotation.
+    "comment_prefix": "//",
+    "comment_suffix": None,
     # Path (relative to repo root) to the pair's run entrypoint.
     "run_entrypoint": "./run",
 }
@@ -217,6 +223,36 @@ def run_program(run_entrypoint: str, flag, test_file: Path, repo_root: Path):
         return "", f"ERROR: could not execute '{run_entrypoint}' -- {exc}", -1
 
 
+def as_token_list(value):
+    """Normalizes a manifest field that may be a single token or a list of them."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value] if value else []
+    return [token for token in value if token]
+
+
+def build_comment_pattern(manifest: dict):
+    """
+    Compiles the pattern that finds an annotation comment on a source line,
+    using whatever comment syntax the group's language actually has.
+
+    "comment_prefix" accepts one token or a list of them, so a language with
+    both `#` and `--` line comments can declare both. Tokens are matched
+    literally, longest first, so a `//` prefix cannot shadow a `///` one.
+    """
+    prefixes = as_token_list(manifest.get("comment_prefix"))
+    if not prefixes:
+        raise ValueError(
+            "manifest.json sets no 'comment_prefix', so inline mode has no way to "
+            "recognize an annotation. Give it your language's comment token, or use "
+            "sidecar mode."
+        )
+    ordered = sorted(prefixes, key=len, reverse=True)
+    alternatives = "|".join(re.escape(token) for token in ordered)
+    return re.compile(f"(?:{alternatives})\\s*(.*)$")
+
+
 def parse_inline_expectations(test_file: Path, manifest: dict):
     """
     Scans a source file for trailing `// expect:` style comments and returns
@@ -226,10 +262,9 @@ def parse_inline_expectations(test_file: Path, manifest: dict):
     `expect error:` lines check stderr (diagnostics) and set the exit code
     accordingly -- matching the convention that runtime/static errors are
     diagnostics, not program output, and so belong on stderr per the run
-    contract. Comment syntax is assumed to be `//` since every language in
-    this course's pool supports it; if a pair's invented language uses
-    different comment syntax, they should use sidecar mode instead (see
-    manifest.json "mode").
+    contract. Comment syntax comes from the manifest's "comment_prefix" and
+    optional "comment_suffix", so a group whose invented language does not use
+    `//` configures it rather than giving up on inline mode.
     """
     expect_prefix = manifest["expect_prefix"]
     error_prefix = manifest["expect_error_prefix"]
@@ -239,7 +274,8 @@ def parse_inline_expectations(test_file: Path, manifest: dict):
     expected_stderr_lines = []
     expected_exit = EXIT_OK
 
-    line_re = re.compile(r"//\s*(.*)$")
+    line_re = build_comment_pattern(manifest)
+    suffixes = as_token_list(manifest.get("comment_suffix"))
 
     text = test_file.read_text()
     for line in text.splitlines():
@@ -247,6 +283,10 @@ def parse_inline_expectations(test_file: Path, manifest: dict):
         if not m:
             continue
         comment = m.group(1).strip()
+        for suffix in suffixes:
+            if comment.endswith(suffix):
+                comment = comment[: -len(suffix)].strip()
+                break
         if comment.startswith(error_prefix):
             expected_stderr_lines.append(comment[len(error_prefix):].strip())
             expected_exit = EXIT_RUNTIME_ERROR
@@ -376,6 +416,13 @@ def main():
     if not test_files:
         print(f"ERROR: no test files with extension '{manifest['ext']}' found under '{test_folder}'.", file=sys.stderr)
         sys.exit(1)
+
+    if manifest["mode"] == "inline":
+        try:
+            build_comment_pattern(manifest)
+        except ValueError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            sys.exit(1)
 
     if manifest["mode"] == "sidecar":
         for orphan in find_orphaned_expectations(test_folder, test_files, repo_root):
