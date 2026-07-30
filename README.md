@@ -36,7 +36,7 @@ curl -sSL https://raw.githubusercontent.com/WhiteLicorice/cmsc-124-harness/v1.0/
 python3 run_tests.py tests/lab1
 ```
 
-It needs Python 3.8 or newer and nothing else. Standard library only, so there
+It needs Python 3.9 or newer and nothing else. Standard library only, so there
 is no `pip install` step, no `venv` requirements.
 
 Windows, Linux, and macOS all work. Windows cannot execute a file whose
