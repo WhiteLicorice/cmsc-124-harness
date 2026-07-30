@@ -453,13 +453,13 @@ than real interpreters. The output ends with:
 All self-checks behaved as expected. run_tests.py is working correctly.
 ```
 
-If you have changed `run_tests.py` itself, which is instructor work that groups
+**For instructors:** If you have changed `run_tests.py` itself, which is instructor work that groups
 should never need to do, run `./selftest.sh` before tagging a release. CI also
 runs it on every push through `.github/workflows/selftest.yml`.
 
 `examples/sidecar-mode/` and `examples/inline-mode/` hold minimal worked repos
 in both modes, including their `run` scripts, if you would rather see the whole
-shape at once than assemble it from this README.
+structure at once than assemble it from this README.
 
 ---
 
@@ -467,7 +467,7 @@ shape at once than assemble it from this README.
 
 - `main` is active development. Do not point your CI at this branch.
 - Tags (`v1.0`, `v1.1`, and so on) are what groups pin to. They get bumped and
-  announced on the course Messenger channel, with a changelog entry, whenever
+  announced through channels, with a changelog entry, whenever
   the harness changes mid-semester.
 
 ## 8. Repo layout
