@@ -5,3 +5,10 @@
 *.py text eol=lf
 *.sh text eol=lf
 run text eol=lf
+
+# The corpus is data, not source, and some of it asserts things about the bytes
+# themselves. One scanner test is about CRLF line endings, and normalising it on
+# the way into the repository would delete the only thing it tests while leaving
+# a green check behind. Nothing under here gets converted, in either direction.
+reference/tests/** -text
+
