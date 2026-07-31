@@ -1,11 +1,44 @@
 name: selftest
+
+# The runner's own test suite. Pure Python, standard library only, so it needs
+# no toolchain and gates every push on all three platforms groups actually use.
+# The Windows leg is the one that earns its keep: the shebang sniffing and bash
+# discovery in build_launch_command only ever execute there.
+
 on:
   push:
   pull_request:
+
 jobs:
-  selftest:
-    runs-on: ubuntu-latest
+  unittest:
+    name: unittest on ${{ matrix.os }}, python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # 3.9 is the floor the README promises groups. If the suite needs
+          # anything newer, the README is wrong.
+          - os: ubuntu-latest
+            python-version: "3.9"
+          - os: ubuntu-latest
+            python-version: "3.13"
+          - os: windows-latest
+            python-version: "3.9"
+          # Apple silicon runners have no 3.9 build, so macOS checks a version
+          # it can actually install.
+          - os: macos-latest
+            python-version: "3.11"
     steps:
       - uses: actions/checkout@v4
-      - run: chmod +x selftest.sh examples/sidecar-mode/run examples/inline-mode/run
-      - run: ./selftest.sh
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Make the example entrypoints executable
+        if: runner.os != 'Windows'
+        run: chmod +x selftest.sh examples/sidecar-mode/run examples/inline-mode/run
+
+      - name: Run the suite
+        run: python -m unittest discover --start-directory tests --top-level-directory tests --verbose
