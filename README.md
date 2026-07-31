@@ -18,7 +18,7 @@ Fetch the pinned script in CI, which is what the CI wiring in the Laboratory Act
 already does for every language:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/WhiteLicorice/cmsc-124-harness/v1.0/run_tests.py -o run_tests.py
+curl -sSL https://raw.githubusercontent.com/WhiteLicorice/cmsc-124-harness/v1.1/run_tests.py -o run_tests.py
 python3 run_tests.py tests/lab0
 ```
 
@@ -32,7 +32,7 @@ You can also download `run_tests.py` and run it on your own machine before
 pushing, exactly as CI would:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/WhiteLicorice/cmsc-124-harness/v1.0/run_tests.py -o run_tests.py
+curl -sSL https://raw.githubusercontent.com/WhiteLicorice/cmsc-124-harness/v1.1/run_tests.py -o run_tests.py
 python3 run_tests.py tests/lab1
 ```
 
@@ -78,6 +78,7 @@ Every field is optional. Anything you leave out falls back to these defaults:
   "expect_prefix": "expect:",
   "expect_error_prefix": "expect runtime error:",
   "expect_compile_error_prefix": "expect error:",
+  "expect_nothing_prefix": "expect nothing",
   "comment_prefix": "//",
   "comment_suffix": null,
   "run_entrypoint": "./run"
@@ -90,13 +91,23 @@ Every field is optional. Anything you leave out falls back to these defaults:
 | `flag` | Optional CLI flag passed to `./run` before the file path, e.g. `--tokenize` for Laboratory Activity 1's scanner stage. `null` for plain execution. |
 | `mode` | `"sidecar"` or `"inline"`. See §4. |
 | `expect_prefix` / `expect_error_prefix` / `expect_compile_error_prefix` | Used in `"inline"` mode only: the annotation prefixes your test files use, written inside a comment. The defaults match the *Crafting Interpreters* convention exactly. |
+| `expect_nothing_prefix` | Used in `"inline"` mode only: how a test file says it produces no output on purpose. See §4. |
 | `comment_prefix` | Used in `"inline"` mode only: how a comment starts in the language you invented. One token, or a list if your language has several. |
 | `comment_suffix` | Used in `"inline"` mode only: how a comment ends, for bracketed comments such as `(* ... *)`. `null` when comments run to end of line. |
 | `run_entrypoint` | Path to your run script, if it is not `./run` at the repo root. |
 
+Those are all the fields there are. A field the harness does not recognize is an
+error rather than something it quietly ignores, because a manifest that says
+`run_entryoint` would otherwise fall back to `./run` without a word. You would
+spend an afternoon debugging an entrypoint that was never being read.
+
 Different lab folders can use different manifests, so `tests/lab1/` might be in
 sidecar mode while `tests/lab3/` is in inline mode. The harness reads whichever
 `manifest.json` sits in the folder you point it at.
+
+Every file the harness reads is UTF-8, on every platform, so accented
+characters and anything else outside ASCII are fine in your test files, your
+expectations, and your manifests.
 
 ---
 
@@ -169,6 +180,27 @@ PRINT 3 + 4
   output, and that the exit code is 70.
 - `// expect error: <message>` does the same but expects exit code 65, for
   static errors caught before execution starts.
+- `// expect nothing` says the file produces no output at all, on purpose.
+
+A file can carry as many diagnostics as it likes. Each one is looked for in
+stderr on its own, so a parser that prints three errors before giving up can be
+tested for all three, in any order, with anything else it prints in between.
+
+That last annotation closes a hole. An inline test with no annotations expects
+no output and exit 0, which any silent program satisfies. So a file whose
+annotations are all typo'd, or that lost them in a bad merge, would pass no
+matter what your interpreter did. The harness now fails a file that asserts
+nothing. It also fails a comment that looks like an annotation but did not
+parse:
+
+```
+print 1;
+// expect : 1
+```
+
+That is one space away from being correct. It used to be worth nothing, and now
+it gets reported by name. If a file is supposed to be silent, say so with
+`// expect nothing` and the harness will hold you to it.
 
 Annotations live in comments, so the harness has to know what a comment looks
 like in the language you invented. It defaults to `//`, and you override it with
@@ -351,7 +383,7 @@ tests/lab1/
 Run it the way CI will:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/WhiteLicorice/cmsc-124-harness/v1.0/run_tests.py -o run_tests.py
+curl -sSL https://raw.githubusercontent.com/WhiteLicorice/cmsc-124-harness/v1.1/run_tests.py -o run_tests.py
 ./build.sh
 python3 run_tests.py tests/lab1
 ```
@@ -445,21 +477,29 @@ cd cmsc-124-harness
 ./selftest.sh
 ```
 
-It takes a few seconds and needs nothing but Python 3 and bash. No per-language
-toolchain is involved, because `examples/*/run` are tiny bash stand-ins rather
-than real interpreters. The output ends with:
-
-```
-All self-checks behaved as expected. run_tests.py is working correctly.
-```
-
-**For instructors:** If you have changed `run_tests.py` itself, which is instructor work that groups
-should never need to do, run `./selftest.sh` before tagging a release. CI also
-runs it on every push through `.github/workflows/selftest.yml`.
+It takes about twenty seconds and needs nothing but Python 3. The checks live in
+`tests/`, written with Python's own `unittest`, so `python3 -m unittest discover
+--start-directory tests --top-level-directory tests` does the same thing if you
+would rather not go through bash. Around a hundred of them run against stand-in
+entrypoints, which is why no per-language toolchain is involved.
 
 `examples/sidecar-mode/` and `examples/inline-mode/` hold minimal worked repos
 in both modes, including their `run` scripts, if you would rather see the whole
 structure at once than assemble it from this README.
+
+**For instructors:** there is a second suite, and it is the one that matters.
+`reference/` holds a real Lox interpreter, written in Haskell, plus a few
+hundred tests across all five activities. Stand-in entrypoints cannot produce a
+token stream, a parse error on stderr, an exit 70, or a program that runs
+forever, so without it the parts of the harness that handle those go untested.
+Building it needs GHC and cabal. See `reference/README.md`. Once it is built the
+mutation tests stop skipping. Each one breaks a committed test on purpose and
+insists the harness catches it and says why.
+
+Run both suites before tagging a release, which is the only time anyone should
+be editing `run_tests.py` at all. CI runs the unittest suite on Linux, Windows,
+and macOS through `.github/workflows/selftest.yml`, and the reference suite on
+Linux and Windows through `.github/workflows/reference.yml`.
 
 ---
 
@@ -474,8 +514,12 @@ structure at once than assemble it from this README.
 
 ```
 run_tests.py                       <- the only file groups actually fetch
-selftest.sh                        <- six-check correctness gate for this repo itself
-.github/workflows/selftest.yml     <- runs selftest.sh in CI on every push
+selftest.sh                        <- runs the suite below
+tests/                             <- the correctness gate for this repo itself
+  test_units.py                      one function at a time
+  test_e2e_fakes.py                  the whole runner, against stand-in entrypoints
+  test_hardening.py                  the failure modes that used to be silent
+  test_e2e_reference.py              the whole runner, against a real interpreter
 examples/
   sidecar-mode/
     run
@@ -489,4 +533,11 @@ examples/
       arithmetic.src
       runtime_error.src
       manifest.json
+reference/                         <- instructor tooling; see reference/README.md
+  xolsh/                             a Lox interpreter, as a submodule
+  driver/                            the four laboratory stages on top of it
+  tests/lab0 ... lab5, crossmode     a few hundred tests to grade it with
+.github/workflows/
+  selftest.yml                     <- the unittest suite, three platforms
+  reference.yml                    <- the reference suite, Linux and Windows
 ```

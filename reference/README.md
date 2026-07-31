@@ -5,9 +5,8 @@ tests against it. Neither is course material. Groups never build this, never
 read it, and never need it. It exists for one reason: so that `run_tests.py` is
 proven against a language instead of against stand-in scripts.
 
-The problem it solves is narrow and worth stating plainly. Before this existed,
-the harness was checked by pointing it at two-line bash scripts that echoed
-their input. Those scripts cannot produce a scanner's token stream, cannot emit
+The problem it solves is narrow. Before this existed, the harness was checked by
+pointing it at two-line bash scripts that echoed their input. Those scripts cannot produce a scanner's token stream, cannot emit
 a parse error on stderr and exit 65, cannot die partway through a program with
 exit 70, and cannot be slow. So the parts of the harness that handle all of
 that were, in effect, untested. A grading tool nobody has stress-tested is a
@@ -63,8 +62,8 @@ A parsed expression looks like the book's:
 (+ (group (- 5.0 (group (- 3.0 1.0)))) (- 1.0))
 ```
 
-Two things about that output are worth knowing before you write a test against
-it. `--parse` prints numbers the way Haskell shows a `Double`, so `5` appears
+Two things about that output will bite you if you write a test without them in
+mind. `--parse` prints numbers the way Haskell shows a `Double`, so `5` appears
 as `5.0`, while `--eval` prints them the way Lox does, so `5.0` appears as `5`.
 That is not an inconsistency to fix: an AST printer is showing you the literal
 the parser built, and an interpreter is showing you a value.
