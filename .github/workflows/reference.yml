@@ -1,0 +1,101 @@
+name: reference
+
+# Grades a real language implementation with the real harness.
+#
+# The unittest workflow proves run_tests.py behaves correctly against stand-in
+# scripts. This one proves it behaves correctly against an actual interpreter:
+# a scanner's token stream, a parser's diagnostics on stderr, an exit 70 from a
+# program that died partway through, and a few hundred committed tests.
+#
+# It runs on Windows as well as Linux because the harness has a Windows-only
+# launch path, and because half the class works on Windows.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# A push that only touches prose does not need a fifteen minute Haskell build.
+concurrency:
+  group: reference-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  conformance:
+    name: reference on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The reference is a submodule, and it is the thing being tested.
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Haskell
+        id: setup-haskell
+        uses: haskell-actions/setup@v2
+        with:
+          # The floor of xolsh's own tested-with range.
+          ghc-version: "9.6.5"
+          cabal-version: "latest"
+
+      - name: Work out the dependency plan
+        working-directory: reference
+        run: cabal build cmsc124-ref --dry-run
+
+      - name: Cache the cabal store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.setup-haskell.outputs.cabal-store }}
+          key: ${{ runner.os }}-ghc9.6.5-${{ hashFiles('reference/dist-newstyle/cache/plan.json') }}
+          restore-keys: ${{ runner.os }}-ghc9.6.5-
+
+      - name: Build the reference
+        working-directory: reference
+        shell: bash
+        run: ./build.sh
+
+      # One step per folder, so a red X in the Actions tab names the activity
+      # that broke. This is the same thing the manuals ask groups to do.
+      - name: Activity 0, plumbing
+        run: python run_tests.py reference/tests/lab0 --repo-root reference
+
+      - name: Activity 1, scanner
+        run: python run_tests.py reference/tests/lab1 --repo-root reference
+
+      - name: Activity 2, parser
+        run: python run_tests.py reference/tests/lab2 --repo-root reference
+
+      - name: Activity 3, evaluator
+        run: python run_tests.py reference/tests/lab3 --repo-root reference
+
+      - name: Activity 4, context
+        run: python run_tests.py reference/tests/lab4 --repo-root reference
+
+      - name: Activity 5, functions
+        run: python run_tests.py reference/tests/lab5 --repo-root reference
+
+      - name: The same programs, inline mode
+        run: python run_tests.py reference/tests/crossmode/inline --repo-root reference
+
+      - name: The same programs, sidecar mode
+        run: python run_tests.py reference/tests/crossmode/sidecar --repo-root reference
+
+      - name: Sidecar expectations are still what the reference produces
+        shell: bash
+        run: |
+          for folder in lab0 lab1 lab2 crossmode/sidecar; do
+            python reference/tools/regen_expected.py "reference/tests/$folder" --check
+          done
+
+      # With the reference present, the mutation tests stop skipping: each one
+      # breaks a committed test on purpose and insists the harness catches it.
+      - name: Mutation tests
+        run: python -m unittest discover --start-directory tests --top-level-directory tests --verbose
