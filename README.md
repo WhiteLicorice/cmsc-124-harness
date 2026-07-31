@@ -29,7 +29,7 @@ bumps the tag, it gets announced through channels with a
 changelog entry. Update the tag in your own workflow only when you are told to.
 
 You can also download `run_tests.py` and run it on your own machine before
-pushing, exactly as CI would:
+pushing, the same way CI would:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/WhiteLicorice/cmsc-124-harness/v1.1/run_tests.py -o run_tests.py
@@ -55,8 +55,8 @@ forward slashes, so shell scripts never have to deal with backslashes.
 
 1. A `./run <path-to-source-file>` entrypoint at your repo root, or wherever
    you point `--repo-root`, that:
-   - prints your program's output to stdout;
-   - prints diagnostics such as parse errors and runtime errors to stderr;
+   - prints your program's output to stdout.
+   - prints diagnostics such as parse errors and runtime errors to stderr.
    - exits 0 on success, 65 on a static or compile-time error, and 70 on a
      runtime error.
 2. A `manifest.json` in each test folder, for example
@@ -123,7 +123,7 @@ committed earlier, not a comparison with anyone else's answer.
 
 For a test file `tests/lab1/foo.src`, commit:
 
-- `tests/lab1/foo.expected`, the exact stdout your `./run` should produce;
+- `tests/lab1/foo.expected`, the exact stdout your `./run` should produce.
 - `tests/lab1/foo.exit`, optional, the expected exit code as plain text. If you
   omit it, 0 is assumed.
 
@@ -487,19 +487,59 @@ entrypoints, which is why no per-language toolchain is involved.
 in both modes, including their `run` scripts, if you would rather see the whole
 structure at once than assemble it from this README.
 
-**For instructors:** there is a second suite, and it is the one that matters.
-`reference/` holds a real Lox interpreter, written in Haskell, plus a few
-hundred tests across all five activities. Stand-in entrypoints cannot produce a
-token stream, a parse error on stderr, an exit 70, or a program that runs
-forever, so without it the parts of the harness that handle those go untested.
-Building it needs GHC and cabal. See `reference/README.md`. Once it is built the
-mutation tests stop skipping. Each one breaks a committed test on purpose and
-insists the harness catches it and says why.
+A grading tool is only as trustworthy as what it has been tested against.
+`reference/` holds a real Lox interpreter and a few hundred tests across all
+five activities, so the harness has been run against an actual
+scanner's token stream, actual parse errors on stderr, actual exit 70s, and an
+actual interpreter that might run forever. The interpreter is written in
+Haskell. Every group in this course writes theirs in something imperative, so
+the reference cannot be lifted into a submission.
 
-Run both suites before tagging a release, which is the only time anyone should
-be editing `run_tests.py` at all. CI runs the unittest suite on Linux, Windows,
-and macOS through `.github/workflows/selftest.yml`, and the reference suite on
-Linux and Windows through `.github/workflows/reference.yml`.
+You do not need any of this to use the harness. It is proof, not plumbing. But
+you can build the reference locally and watch the same suite that CI runs
+against it grade your own tests:
+
+```bash
+# One-time. ghcup puts GHC and cabal on your PATH.
+curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
+
+# Clone with the nested submodule and build the interpreter.
+git clone --recurse-submodules https://github.com/WhiteLicorice/cmsc-124-harness.git
+cd cmsc-124-harness/reference
+./build.sh
+
+# Run the harness against the reference, one activity at a time.
+cd ..
+python3 run_tests.py reference/tests/lab1 --repo-root reference
+python3 run_tests.py reference/tests/lab3 --repo-root reference
+python3 run_tests.py reference/tests/lab5 --repo-root reference
+
+# With the reference built, the mutation suite runs: each test breaks
+# something on purpose and insists the harness catches it.
+python3 -m unittest discover --start-directory tests --top-level-directory tests
+```
+
+On Windows, GHC's linker breaks on a path with a space. The course materials
+live under `CMSC 124`, so `build.sh` detects that and builds somewhere else.
+
+If you are setting up from Windows itself rather than WSL, install Git Bash
+first (it is a course requirement) and launch it from there. Then fetch GHCup
+through its Windows installer instead of `curl`:
+
+```powershell
+# PowerShell, one time.
+Invoke-WebRequest -Uri "https://downloads.haskell.org/~ghcup/x86_64-mingw64-ghcup.exe" -OutFile ghcup.exe
+./ghcup.exe install ghc 9.6.5 --set
+./ghcup.exe install cabal latest --set
+```
+
+After that, the build and test steps above work from Git Bash. Everything the
+harness needs, and everything the reference needs, is the same on every
+platform.
+
+CI runs the unittest suite on Linux, Windows, and macOS through
+`.github/workflows/selftest.yml`, and the reference suite on Linux and Windows
+through `.github/workflows/reference.yml`.
 
 ---
 

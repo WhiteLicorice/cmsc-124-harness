@@ -65,8 +65,8 @@ A parsed expression looks like the book's:
 Two things about that output will bite you if you write a test without them in
 mind. `--parse` prints numbers the way Haskell shows a `Double`, so `5` appears
 as `5.0`, while `--eval` prints them the way Lox does, so `5.0` appears as `5`.
-That is not an inconsistency to fix: an AST printer is showing you the literal
-the parser built, and an interpreter is showing you a value.
+That is not an inconsistency to fix. An AST printer is showing you the literal
+the parser built. An interpreter is showing you a value.
 
 The other is that Lox needs its semicolons. The book's own chapter tests write
 a bare expression with no semicolon, because the book swaps in a
@@ -93,7 +93,7 @@ every one of a few hundred test files.
 
 ## Running the tests
 
-From the repository root, one folder at a time, exactly the way a group's CI
+From the repository root, one folder at a time, the way a group's CI
 workflow does it:
 
 ```bash
