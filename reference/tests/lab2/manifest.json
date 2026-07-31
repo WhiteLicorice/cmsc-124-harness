@@ -1,0 +1,5 @@
+{
+  "ext": ".lox",
+  "mode": "sidecar",
+  "flag": "--parse"
+}

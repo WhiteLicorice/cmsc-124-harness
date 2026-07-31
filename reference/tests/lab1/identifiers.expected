@@ -1,0 +1,9 @@
+[line 1] IDENTIFIER a null
+[line 1] IDENTIFIER A null
+[line 1] IDENTIFIER _ null
+[line 1] IDENTIFIER _123 null
+[line 1] IDENTIFIER _abc null
+[line 1] IDENTIFIER ab123 null
+[line 1] IDENTIFIER zzz null
+[line 1] IDENTIFIER Z9 null
+[line 2] EOF <eof> null

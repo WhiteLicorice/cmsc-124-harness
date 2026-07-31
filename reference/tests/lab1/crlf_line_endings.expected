@@ -1,0 +1,11 @@
+[line 1] VAR var null
+[line 1] IDENTIFIER a null
+[line 1] EQUAL = null
+[line 1] NUMBER 1 1.0
+[line 1] SEMICOLON ; null
+[line 2] VAR var null
+[line 2] IDENTIFIER b null
+[line 2] EQUAL = null
+[line 2] NUMBER 2 2.0
+[line 2] SEMICOLON ; null
+[line 3] EOF <eof> null

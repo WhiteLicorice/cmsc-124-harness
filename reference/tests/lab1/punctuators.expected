@@ -1,0 +1,12 @@
+[line 1] LEFT_PAREN ( null
+[line 1] RIGHT_PAREN ) null
+[line 1] LEFT_BRACE { null
+[line 1] RIGHT_BRACE } null
+[line 1] COMMA , null
+[line 1] DOT . null
+[line 1] MINUS - null
+[line 1] PLUS + null
+[line 1] SEMICOLON ; null
+[line 1] STAR * null
+[line 1] SLASH / null
+[line 2] EOF <eof> null

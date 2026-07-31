@@ -1,0 +1,2 @@
+// expect error: Expect ')' after parameters.
+fun foo(a, b c, d, e, f) {}

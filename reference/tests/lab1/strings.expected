@@ -1,0 +1,5 @@
+[line 1] STRING "" 
+[line 1] STRING "a" a
+[line 1] STRING "hello world" hello world
+[line 1] STRING "with 'single' quotes" with 'single' quotes
+[line 2] EOF <eof> null

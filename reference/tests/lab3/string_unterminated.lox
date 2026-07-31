@@ -1,0 +1,2 @@
+// expect error: Unterminated string.
+"this string has no close quote

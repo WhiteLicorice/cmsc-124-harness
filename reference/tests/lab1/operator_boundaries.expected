@@ -1,0 +1,8 @@
+[line 1] BANG_EQUAL != null
+[line 1] BANG_EQUAL != null
+[line 1] EQUAL_EQUAL == null
+[line 1] LESS_EQUAL <= null
+[line 1] LESS < null
+[line 1] GREATER_EQUAL >= null
+[line 1] GREATER > null
+[line 2] EOF <eof> null

@@ -1,0 +1,5 @@
+"(" + "" + ")";   // expect: ()
+"a string"; // expect: a string
+
+// Non-ASCII.
+"A~¶Þॐஃ"; // expect: A~¶Þॐஃ

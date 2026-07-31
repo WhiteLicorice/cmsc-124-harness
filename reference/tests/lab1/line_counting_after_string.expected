@@ -1,0 +1,3 @@
+[line 3] STRING "a\nb\nc" a\nb\nc
+[line 3] IDENTIFIER after null
+[line 4] EOF <eof> null

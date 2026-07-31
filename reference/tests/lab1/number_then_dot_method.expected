@@ -1,0 +1,4 @@
+[line 1] NUMBER 123 123.0
+[line 1] DOT . null
+[line 1] IDENTIFIER abc null
+[line 2] EOF <eof> null

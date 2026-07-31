@@ -1,0 +1,2 @@
+// expect error: Expect expression.
+if (true) "ok"; else fun foo() {}

@@ -1,0 +1,14 @@
+nil == nil; // expect: true
+
+true == true; // expect: true
+true == false; // expect: false
+
+1 == 1; // expect: true
+1 == 2; // expect: false
+
+"str" == "str"; // expect: true
+"str" == "ing"; // expect: false
+
+nil == false; // expect: false
+false == 0; // expect: false
+0 == "0"; // expect: false

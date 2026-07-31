@@ -1,0 +1,2 @@
+// expect error: Expect variable name.
+var false = "value";

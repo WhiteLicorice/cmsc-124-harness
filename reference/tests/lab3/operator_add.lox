@@ -1,0 +1,2 @@
+123 + 456; // expect: 579
+"str" + "ing"; // expect: string

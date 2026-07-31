@@ -1,0 +1,4 @@
+[line 1] VAR var null
+[line 2] IDENTIFIER a null
+[line 2] SEMICOLON ; null
+[line 3] EOF <eof> null

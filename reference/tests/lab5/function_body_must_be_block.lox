@@ -1,0 +1,2 @@
+// expect error: Expect '{' before function body.
+fun f() 123;

@@ -1,0 +1,5 @@
+[line 1] NUMBER 0.0 0.0
+[line 1] NUMBER 1.5 1.5
+[line 1] NUMBER 123.456 123.456
+[line 1] NUMBER 0.001 1.0e-3
+[line 2] EOF <eof> null
