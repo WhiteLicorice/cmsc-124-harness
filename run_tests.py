@@ -53,6 +53,9 @@ DEFAULT_MANIFEST = {
     "expect_prefix": "expect:",
     "expect_error_prefix": "expect runtime error:",
     "expect_compile_error_prefix": "expect error:",
+    # Says, on purpose, that a test file produces no output at all. Without it,
+    # a file whose annotations are all typo'd would assert nothing and pass.
+    "expect_nothing_prefix": "expect nothing",
     # Only used when mode == "inline": how a comment starts, and optionally
     # ends, in the pair's own invented language. Either field accepts one token
     # or a list of them. A suffix is only needed for bracketed comments, where
@@ -68,11 +71,34 @@ EXIT_STATIC_ERROR = 65
 EXIT_RUNTIME_ERROR = 70
 
 
+class ConfigError(Exception):
+    """A problem in a manifest, reported as an error message rather than a traceback."""
+
+
 @dataclass
 class TestResult:
     name: str
     passed: bool
     detail: str = ""
+
+
+@dataclass
+class InlineExpectations:
+    """What a test file's annotation comments claim should happen."""
+
+    stdout_lines: list = field(default_factory=list)
+    # Each entry is checked against stderr on its own. Diagnostics do not always
+    # come out adjacent, and one blob match cannot say which one went missing.
+    stderr_substrings: list = field(default_factory=list)
+    exit_code: int = EXIT_OK
+    # Comments that read like an annotation but did not parse as one.
+    malformed: list = field(default_factory=list)
+    # True when the file explicitly claims it produces no output.
+    declared_silent: bool = False
+
+    @property
+    def is_empty(self):
+        return not self.stdout_lines and not self.stderr_substrings
 
 
 @dataclass
@@ -99,12 +125,44 @@ class Summary:
 
 
 def load_manifest(folder: Path) -> dict:
+    """
+    Reads manifest.json, layered over the documented defaults.
+
+    Every problem here is a typo in a file somebody hand-wrote, so each one gets
+    a sentence naming the file and the fix. An unknown key is an error rather
+    than a shrug: silently falling back to the default is how a group spends an
+    afternoon debugging an entrypoint that was never being read.
+    """
     manifest = dict(DEFAULT_MANIFEST)
     manifest_path = folder / "manifest.json"
-    if manifest_path.exists():
+    if not manifest_path.exists():
+        return manifest
+
+    try:
         with open(manifest_path) as f:
             user_manifest = json.load(f)
-        manifest.update(user_manifest)
+    except json.JSONDecodeError as exc:
+        raise ConfigError(
+            f"'{manifest_path}' is not valid JSON: {exc.msg} (line {exc.lineno}, column {exc.colno})."
+        )
+    except OSError as exc:
+        raise ConfigError(f"could not read '{manifest_path}': {exc}.")
+
+    if not isinstance(user_manifest, dict):
+        raise ConfigError(
+            f"'{manifest_path}' must hold a JSON object of settings, "
+            f"not a {type(user_manifest).__name__}."
+        )
+
+    unknown = sorted(set(user_manifest) - set(DEFAULT_MANIFEST))
+    if unknown:
+        raise ConfigError(
+            f"'{manifest_path}' sets {', '.join(repr(k) for k in unknown)}, which "
+            "run_tests.py does not recognize. Check the spelling. The settings it "
+            f"reads are: {', '.join(sorted(DEFAULT_MANIFEST))}."
+        )
+
+    manifest.update(user_manifest)
     return manifest
 
 
@@ -253,26 +311,58 @@ def build_comment_pattern(manifest: dict):
     return re.compile(f"(?:{alternatives})\\s*(.*)$")
 
 
-def parse_inline_expectations(test_file: Path, manifest: dict):
+def squash(text: str) -> str:
+    """Lowercases and drops whitespace, so `Expect : 1` and `expect:1` compare equal."""
+    return "".join(text.split()).lower()
+
+
+def looks_like_annotation(comment: str, prefixes) -> bool:
     """
-    Scans a source file for trailing `// expect:` style comments and returns
-    (expected_stdout_lines, expected_stderr_substring_or_None, expected_exit_code).
+    Decides whether a comment that did not parse was nonetheless trying to be an
+    annotation, so the typo can be reported instead of silently ignored.
+
+    Two ways to look like one: the right words with the wrong spacing or case
+    (`// Expect : 1`), or a misspelled keyword that still ends in a colon
+    (`// expected: 1`). Prose comments have neither, so `// note: this is slow`
+    stays a comment.
+    """
+    squashed = squash(comment)
+    for prefix in prefixes:
+        if squashed.startswith(squash(prefix)):
+            return True
+
+    head, separator, _ = squashed.partition(":")
+    if not separator or not head:
+        return False
+    for prefix in prefixes:
+        stem = squash(prefix).partition(":")[0][:5]
+        if stem and head.startswith(stem):
+            return True
+    return False
+
+
+def parse_inline_expectations(test_file: Path, manifest: dict) -> InlineExpectations:
+    """
+    Scans a source file for trailing `// expect:` style comments.
 
     `expect:` lines check stdout (program output). `expect runtime error:` and
     `expect error:` lines check stderr (diagnostics) and set the exit code
     accordingly -- matching the convention that runtime/static errors are
     diagnostics, not program output, and so belong on stderr per the run
-    contract. Comment syntax comes from the manifest's "comment_prefix" and
-    optional "comment_suffix", so a group whose invented language does not use
-    `//` configures it rather than giving up on inline mode.
+    contract. `expect nothing` states that the file produces no output at all.
+    Comment syntax comes from the manifest's "comment_prefix" and optional
+    "comment_suffix", so a group whose invented language does not use `//`
+    configures it rather than giving up on inline mode.
     """
     expect_prefix = manifest["expect_prefix"]
     error_prefix = manifest["expect_error_prefix"]
     compile_error_prefix = manifest["expect_compile_error_prefix"]
+    nothing_prefix = manifest["expect_nothing_prefix"]
+    known_prefixes = [
+        p for p in (error_prefix, compile_error_prefix, nothing_prefix, expect_prefix) if p
+    ]
 
-    expected_lines = []
-    expected_stderr_lines = []
-    expected_exit = EXIT_OK
+    found = InlineExpectations()
 
     line_re = build_comment_pattern(manifest)
     suffixes = as_token_list(manifest.get("comment_suffix"))
@@ -287,17 +377,20 @@ def parse_inline_expectations(test_file: Path, manifest: dict):
             if comment.endswith(suffix):
                 comment = comment[: -len(suffix)].strip()
                 break
-        if comment.startswith(error_prefix):
-            expected_stderr_lines.append(comment[len(error_prefix):].strip())
-            expected_exit = EXIT_RUNTIME_ERROR
-        elif comment.startswith(compile_error_prefix):
-            expected_stderr_lines.append(comment[len(compile_error_prefix):].strip())
-            expected_exit = EXIT_STATIC_ERROR
-        elif comment.startswith(expect_prefix):
-            expected_lines.append(comment[len(expect_prefix):].strip())
+        if error_prefix and comment.startswith(error_prefix):
+            found.stderr_substrings.append(comment[len(error_prefix):].strip())
+            found.exit_code = EXIT_RUNTIME_ERROR
+        elif compile_error_prefix and comment.startswith(compile_error_prefix):
+            found.stderr_substrings.append(comment[len(compile_error_prefix):].strip())
+            found.exit_code = EXIT_STATIC_ERROR
+        elif nothing_prefix and comment.startswith(nothing_prefix):
+            found.declared_silent = True
+        elif expect_prefix and comment.startswith(expect_prefix):
+            found.stdout_lines.append(comment[len(expect_prefix):].strip())
+        elif looks_like_annotation(comment, known_prefixes):
+            found.malformed.append(comment)
 
-    expected_stderr = "\n".join(expected_stderr_lines) if expected_stderr_lines else None
-    return expected_lines, expected_stderr, expected_exit
+    return found
 
 
 def parse_sidecar_expectations(test_file: Path):
@@ -316,7 +409,14 @@ def parse_sidecar_expectations(test_file: Path):
 
     expected_exit = EXIT_OK
     if exit_path.exists():
-        expected_exit = int(exit_path.read_text().strip())
+        raw = exit_path.read_text().strip()
+        try:
+            expected_exit = int(raw)
+        except ValueError:
+            raise ConfigError(
+                f"'{exit_path.name}' should hold just an exit code, like 65, "
+                f"but it holds {raw!r}."
+            )
 
     return expected_stdout, expected_exit
 
@@ -325,13 +425,38 @@ def run_single_test(test_file: Path, manifest: dict, repo_root: Path) -> TestRes
     name = str(test_file.relative_to(repo_root)) if test_file.is_relative_to(repo_root) else str(test_file)
 
     mode = manifest["mode"]
-    expected_stderr_substring = None
+    expected_stderr_substrings = []
 
     if mode == "inline":
-        expected_lines, expected_stderr_substring, expected_exit = parse_inline_expectations(test_file, manifest)
-        expected_stdout = "\n".join(expected_lines) + ("\n" if expected_lines else "")
+        expected = parse_inline_expectations(test_file, manifest)
+        if expected.malformed:
+            listed = "\n".join(f"  {comment}" for comment in expected.malformed)
+            return TestResult(
+                name,
+                False,
+                "these comments look like annotations but did not parse, so they "
+                f"assert nothing:\n{listed}\n"
+                f"An annotation reads exactly '{manifest['expect_prefix']} <value>'.",
+            )
+        if expected.is_empty and not expected.declared_silent:
+            return TestResult(
+                name,
+                False,
+                "no expectations found in this file, so it would pass no matter what "
+                f"the interpreter did. Add '{manifest['expect_prefix']} <value>' "
+                f"annotations, or '{manifest['expect_nothing_prefix']}' if the file "
+                "really does produce no output.",
+            )
+        expected_stderr_substrings = expected.stderr_substrings
+        expected_exit = expected.exit_code
+        expected_stdout = "\n".join(expected.stdout_lines) + (
+            "\n" if expected.stdout_lines else ""
+        )
     elif mode == "sidecar":
-        expected_stdout, expected_exit = parse_sidecar_expectations(test_file)
+        try:
+            expected_stdout, expected_exit = parse_sidecar_expectations(test_file)
+        except ConfigError as exc:
+            return TestResult(name, False, str(exc))
         if expected_stdout is None:
             return TestResult(name, False, "No .expected sidecar file found next to this test.")
     else:
@@ -358,14 +483,19 @@ def run_single_test(test_file: Path, manifest: dict, repo_root: Path) -> TestRes
         )
         problems.append(f"stdout mismatch:\n{diff}")
 
-    if expected_stderr_substring is not None and expected_stderr_substring not in stderr:
+    # Each expected diagnostic is looked for on its own. Checking them as one
+    # joined blob would demand they come out adjacent and in order, and would
+    # report the whole blob as missing when only one of them was.
+    missing = [wanted for wanted in expected_stderr_substrings if wanted not in stderr]
+    if missing:
+        wanted = "\n".join(f"  {m}" for m in missing)
         problems.append(
-            f"stderr mismatch: expected to find:\n  {expected_stderr_substring}\ngot stderr:\n  {stderr.strip()}"
+            f"stderr mismatch: expected to find:\n{wanted}\ngot stderr:\n  {stderr.strip()}"
         )
 
     if problems:
         detail = "\n".join(problems)
-        if stderr.strip() and expected_stderr_substring is None:
+        if stderr.strip() and not expected_stderr_substrings:
             detail += f"\n(stderr was: {stderr.strip()})"
         return TestResult(name, False, detail)
 
@@ -410,7 +540,12 @@ def main():
         print(f"ERROR: test folder '{test_folder}' does not exist.", file=sys.stderr)
         sys.exit(1)
 
-    manifest = load_manifest(test_folder)
+    try:
+        manifest = load_manifest(test_folder)
+    except ConfigError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        sys.exit(1)
+
     test_files = find_test_files(test_folder, manifest["ext"])
 
     if not test_files:
