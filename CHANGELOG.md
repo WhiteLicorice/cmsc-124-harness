@@ -5,15 +5,15 @@ entry here and an announcement through the usual channels.
 
 ## v1.1
 
-The release the course runs on. Everything below came out of building a real
+The release the course runs on. Everything below came out of building a
 language implementation and pointing the harness at it, which is now part of
 this repository as `reference/`.
 
 ### Test files that asserted nothing now fail
 
 An inline test whose annotations were typo'd parsed to zero expectations, so it
-expected no output and exit 0, and any silent program passed it. A group could
-ship broken annotations and CI would agree with them all semester.
+expected no output and exit 0. Any silent program passed it. A group could ship
+broken annotations and CI would agree with them all semester.
 
 A file with no expectations now fails, and so does a comment that reads like an
 annotation but did not parse, such as `// expect : 1`. A file that really is
@@ -29,8 +29,7 @@ missing when only one of them was.
 
 The fifteen second timeout stopped the process the harness had launched, which
 on Windows is bash, and left the interpreter bash had started still running
-with the output pipe open. The harness then waited on that pipe forever. One
-infinite loop in one test would have hung grading rather than failing it.
+with the output pipe open. The harness then waited on that pipe forever. A single infinite loop in a test would have hung grading rather than failing it.
 
 ### Everything is read and written as UTF-8
 
@@ -43,9 +42,7 @@ A misspelled `run_entryoint` used to fall back to `./run` in silence.
 
 ### Malformed input explains itself
 
-A `.exit` file that does not hold a number, a `manifest.json` that is not valid
-JSON, and a `manifest.json` that is not an object each used to raise a Python
-traceback. They now name the file and say what is wrong with it.
+A `.exit` file that does not hold a number, a `manifest.json` that is not valid JSON, and a `manifest.json` that is not an object each used to raise a Python traceback. They now name the file and say what is wrong with it.
 
 ### The self-test is a Python suite
 
@@ -55,5 +52,4 @@ eight to well over a hundred. They run on Linux, Windows, and macOS.
 
 ## v1.0
 
-First release. Language-agnostic runner, sidecar and inline annotation modes,
-configurable comment syntax, and a Windows launcher for shell entrypoints.
+First release. Language-agnostic runner, sidecar and inline annotation modes, configurable comment syntax, and a Windows launcher for shell entrypoints.

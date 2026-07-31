@@ -43,8 +43,8 @@ Windows, Linux, and macOS all work. Windows cannot execute a file whose
 executability comes from a shebang line, so on Windows the harness reads that
 line and names the interpreter itself: a `run` beginning with
 `#!/usr/bin/env bash` gets launched as `bash run`, using the bash that Git for
-Windows installs (Git for Windows is a course requirement). This needs nothing from you, and it does not need WSL. A
-native `.exe`, `.bat`, or `.cmd` entrypoint is launched directly.
+Windows installs (Git for Windows is a course requirement). This needs nothing from you. It does not need WSL. A native
+`.exe`, `.bat`, or `.cmd` entrypoint is launched directly.
 
 Your entrypoint always receives the test file as a repo-relative path with
 forward slashes, so shell scripts never have to deal with backslashes.
@@ -176,8 +176,8 @@ PRINT 3 + 4
 
 - `// expect: <value>` checks stdout, line by line, in order.
 - `// expect runtime error: <message>` checks that the message appears on
-  stderr, since diagnostics are diagnostics and do not belong in program
-  output, and that the exit code is 70.
+  stderr and that the exit code is 70, since a diagnostic belongs there rather
+  than in program output.
 - `// expect error: <message>` does the same but expects exit code 65, for
   static errors caught before execution starts.
 - `// expect nothing` says the file produces no output at all, on purpose.
@@ -249,10 +249,9 @@ error rather than silently treating every line as an annotation.
 
 ### Which mode to reach for
 
-Inline mode is the better default wherever it fits, and it is what *Crafting
-Interpreters* does. One file is one test case: the program, the output it should
-produce, and the exit code it should end on all sit together, so a reviewer sees
-the whole claim at once and your commit history shows one new file per new test
+Inline mode is the better default wherever it fits. It is what *Crafting
+Interpreters* does. One file is one test case. It holds the program, the output it should produce, and the exit code it should end on. A reviewer sees the
+whole claim at once. Your commit history shows one new file per new test
 instead of two or three.
 
 Sidecar mode earns its place when your expected output reports positions in the
@@ -271,7 +270,7 @@ var y
 ```
 
 `var y` is on line 4, not line 2, because two comments sit above it. Writing the
-intuitive `line=2` produces a genuine mismatch:
+intuitive `line=2` produces a mismatch:
 
 ```
        stdout mismatch:
@@ -354,7 +353,7 @@ print greeting
 ```
 
 Run your interpreter on it once by hand, look hard at the output, and decide
-whether it is what you actually meant. Once you believe it, that output becomes
+whether it is what you meant. Once you believe it, that output becomes
 `tests/lab1/keywords.expected`:
 
 ```
@@ -435,8 +434,8 @@ you refactor your scanner and it starts emitting `STR` where it used to emit
 1/2 tests passed.
 ```
 
-That tells you the refactor turned a clean rejection into a crash, which is a
-real regression and precisely what the committed expectations are for.
+That tells you the refactor turned a clean rejection into a crash, a regression
+the committed expectations exist to catch.
 
 Later, once you are past the scanner and your tests are about computed values
 rather than token positions, switch that lab's folder to inline mode. The
@@ -468,8 +467,8 @@ expected. Nothing else needs to exist for that test.
 ## 6. Fast way to verify the harness works before you trust it
 
 Do not take `run_tests.py` on faith. Run the bundled self-test, which exercises
-both modes and, more importantly, confirms that the script actually *fails* a
-test that deserves to fail, rather than only passing tests that deserve to pass:
+both modes and, more importantly, confirms that the script *fails* a test that
+deserves to fail, rather than only passing tests that deserve to pass:
 
 ```bash
 git clone https://github.com/WhiteLicorice/cmsc-124-harness.git
@@ -488,11 +487,11 @@ in both modes, including their `run` scripts, if you would rather see the whole
 structure at once than assemble it from this README.
 
 A grading tool is only as trustworthy as what it has been tested against.
-`reference/` holds a real Lox interpreter and a few hundred tests across all
+`reference/` holds a Lox interpreter and a few hundred tests across all
 five activities, so the harness has been run against an actual
 scanner's token stream, actual parse errors on stderr, actual exit 70s, and an
 actual interpreter that might run forever. The interpreter is written in
-Haskell. Every group in this course writes theirs in something imperative, so
+Haskell, a functional language. Every group in this course writes theirs in something imperative, so
 the reference cannot be lifted into a submission.
 
 You do not need any of this to use the harness. It is proof, not plumbing. But
@@ -533,12 +532,11 @@ Invoke-WebRequest -Uri "https://downloads.haskell.org/~ghcup/x86_64-mingw64-ghcu
 ./ghcup.exe install cabal latest --set
 ```
 
-After that, the build and test steps above work from Git Bash. Everything the
-harness needs, and everything the reference needs, is the same on every
-platform.
+After that, the build and test steps above work from Git Bash. The harness and
+the reference need the same things on every platform.
 
 CI runs the unittest suite on Linux, Windows, and macOS through
-`.github/workflows/selftest.yml`, and the reference suite on Linux and Windows
+`.github/workflows/selftest.yml`. The reference suite runs on Linux and Windows
 through `.github/workflows/reference.yml`.
 
 ---

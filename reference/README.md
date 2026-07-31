@@ -1,9 +1,9 @@
 # The reference implementation
 
-This folder holds a real, working language implementation and a few hundred
-tests against it. Neither is course material. Groups never build this, never
-read it, and never need it. It exists for one reason: so that `run_tests.py` is
-proven against a language instead of against stand-in scripts.
+This folder holds a working language implementation in Haskell and a few hundred tests
+against it. Neither is course material. Groups never build this, never read it,
+and never need it. It exists for one reason: so that `run_tests.py` is proven
+against a language instead of against stand-in scripts.
 
 The problem it solves is narrow. Before this existed, the harness was checked by
 pointing it at two-line bash scripts that echoed their input. Those scripts cannot produce a scanner's token stream, cannot emit
@@ -23,7 +23,7 @@ functional language cannot be quietly lifted into a submission.
 contract on top of xolsh's library. It reuses xolsh's scanner, parser, AST
 printer, resolver, and interpreter, and implements none of them. That matters:
 if the driver reimplemented anything, the suite would be testing the driver's
-opinion of Lox rather than a real one.
+opinion of Lox rather than the language itself.
 
 `tests/` is the corpus, one folder per laboratory activity.
 
@@ -69,9 +69,9 @@ That is not an inconsistency to fix. An AST printer is showing you the literal
 the parser built. An interpreter is showing you a value.
 
 The other is that Lox needs its semicolons. The book's own chapter tests write
-a bare expression with no semicolon, because the book swaps in a
-one-expression parser for those chapters. This reference does not: `--parse`
-and `--eval` run the real parser and then require every statement in the file
+a bare expression with no semicolon, because the book swaps in a parser that
+reads a single expression for those chapters. This reference does not: `--parse`
+and `--eval` run the full parser and then require every statement in the file
 to be an expression statement, rejecting anything else with exit 65. So a
 test file for those stages is a list of expressions, each ending in `;`.
 
@@ -119,4 +119,4 @@ python3 reference/tools/regen_expected.py reference/tests/lab1
 
 Read the diff before committing it. A generated expectation that nobody looks
 at records whatever the implementation happened to do that day, including its
-bugs, and that is how a corpus quietly stops meaning anything.
+bugs. That's how a corpus quietly stops meaning anything.
