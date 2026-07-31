@@ -21,6 +21,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -65,6 +66,9 @@ DEFAULT_MANIFEST = {
     # Path (relative to repo root) to the pair's run entrypoint.
     "run_entrypoint": "./run",
 }
+
+# How long a single test file gets before the harness gives up on it.
+TIMEOUT_SECONDS = 15
 
 EXIT_OK = 0
 EXIT_STATIC_ERROR = 65
@@ -139,7 +143,7 @@ def load_manifest(folder: Path) -> dict:
         return manifest
 
     try:
-        with open(manifest_path) as f:
+        with open(manifest_path, encoding="utf-8") as f:
             user_manifest = json.load(f)
     except json.JSONDecodeError as exc:
         raise ConfigError(
@@ -247,6 +251,62 @@ def build_launch_command(run_entrypoint: str, repo_root: Path):
     return [resolved, run_entrypoint], None
 
 
+def terminate_tree(proc):
+    """
+    Kills the process and everything it started.
+
+    Killing only the process the harness launched is not enough. A run
+    entrypoint is usually a shell script, so on Windows the interpreter is a
+    grandchild, and it inherits the pipe the harness is about to read. Kill the
+    shell alone and the interpreter keeps running with that pipe open, so the
+    read never returns and grading hangs on a test that should have been
+    reported as a timeout in fifteen seconds.
+    """
+    if IS_WINDOWS:
+        # taskkill walks the tree; there is no process group to signal.
+        subprocess.run(
+            ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+            capture_output=True,
+        )
+    else:
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass
+    proc.kill()
+
+
+def run_with_timeout(cmd, repo_root: Path, timeout: int):
+    """Runs a command, and makes sure it is gone when the time is up."""
+    proc = subprocess.Popen(
+        cmd,
+        cwd=repo_root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        # Everything in this harness is UTF-8, including whatever the
+        # interpreter under test prints. Letting Python pick the platform
+        # encoding instead would mangle a group's output on Windows and leave
+        # it alone on the Linux runner, so the same test would pass in CI and
+        # fail on their machine.
+        encoding="utf-8",
+        errors="replace",
+        # A session of its own on POSIX, so the whole tree can be signalled.
+        start_new_session=not IS_WINDOWS,
+    )
+
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
+        return stdout, stderr, proc.returncode
+    except subprocess.TimeoutExpired:
+        terminate_tree(proc)
+        # Now that nothing is left holding the pipes, this returns.
+        try:
+            stdout, stderr = proc.communicate(timeout=10)
+        except subprocess.TimeoutExpired:
+            stdout, stderr = "", ""
+        return stdout, f"TIMEOUT: process exceeded {timeout}s\n{stderr}", -1
+
+
 def run_program(run_entrypoint: str, flag, test_file: Path, repo_root: Path):
     cmd, error = build_launch_command(run_entrypoint, repo_root)
     if error:
@@ -265,16 +325,7 @@ def run_program(run_entrypoint: str, flag, test_file: Path, repo_root: Path):
     cmd.append(test_argument)
 
     try:
-        proc = subprocess.run(
-            cmd,
-            cwd=repo_root,
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
-        return proc.stdout, proc.stderr, proc.returncode
-    except subprocess.TimeoutExpired:
-        return "", "TIMEOUT: process exceeded 15s", -1
+        return run_with_timeout(cmd, repo_root, TIMEOUT_SECONDS)
     except FileNotFoundError:
         return "", f"ERROR: could not execute '{run_entrypoint}' -- is it committed and chmod +x?", -1
     except OSError as exc:
@@ -367,7 +418,7 @@ def parse_inline_expectations(test_file: Path, manifest: dict) -> InlineExpectat
     line_re = build_comment_pattern(manifest)
     suffixes = as_token_list(manifest.get("comment_suffix"))
 
-    text = test_file.read_text()
+    text = test_file.read_text(encoding="utf-8")
     for line in text.splitlines():
         m = line_re.search(line)
         if not m:
@@ -405,11 +456,11 @@ def parse_sidecar_expectations(test_file: Path):
     if not expected_path.exists():
         return None, None  # signals "no sidecar found"
 
-    expected_stdout = expected_path.read_text()
+    expected_stdout = expected_path.read_text(encoding="utf-8")
 
     expected_exit = EXIT_OK
     if exit_path.exists():
-        raw = exit_path.read_text().strip()
+        raw = exit_path.read_text(encoding="utf-8").strip()
         try:
             expected_exit = int(raw)
         except ValueError:

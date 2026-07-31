@@ -1,0 +1,4 @@
+[submodule "reference/xolsh"]
+	path = reference/xolsh
+	url = https://github.com/WhiteLicorice/xolsh.git
+	branch = main

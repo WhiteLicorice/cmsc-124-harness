@@ -8,6 +8,8 @@ message. A grading tool gets exactly one chance to be trusted, so each of these
 is pinned.
 """
 
+import subprocess
+import time
 import unittest
 
 from support import ScratchRepo
@@ -180,6 +182,96 @@ class MalformedInputTests(unittest.TestCase):
         output = result.stdout + result.stderr
         self.assertNotEqual(result.returncode, 0)
         self.assertNotIn("Traceback", output)
+
+
+class EncodingTests(unittest.TestCase):
+    """
+    Everything is UTF-8, on every platform.
+
+    Python's read_text defaults to the platform encoding, which is cp1252 on a
+    Windows machine and UTF-8 on the Linux runner. A group with an accented
+    character in a string literal would watch CI go green and their own machine
+    raise a UnicodeDecodeError, which is the worst way to learn about this.
+    """
+
+    ECHO_RUN = (
+        "#!/usr/bin/env python3\n"
+        "import io, sys\n"
+        "sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')\n"
+        "sys.stdout.write(open(sys.argv[-1], encoding='utf-8').read().split('//')[0].strip() + '\\n')\n"
+    )
+
+    def test_non_ascii_in_an_inline_test_file(self):
+        with ScratchRepo() as repo:
+            repo.write_run(self.ECHO_RUN)
+            repo.write("tests/lab3/manifest.json", INLINE_MANIFEST)
+            repo.write("tests/lab3/a.src", "sayõ  // expect: sayõ\n")
+            result = repo.run_harness("tests/lab3")
+        self.assertNotIn("Traceback", result.stdout + result.stderr)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_non_ascii_in_a_sidecar_expectation(self):
+        with ScratchRepo() as repo:
+            repo.write_run(self.ECHO_RUN)
+            repo.write("tests/lab1/a.src", "façade\n")
+            repo.write("tests/lab1/a.expected", "façade\n")
+            result = repo.run_harness("tests/lab1")
+        self.assertNotIn("Traceback", result.stdout + result.stderr)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_non_ascii_in_a_manifest(self):
+        with ScratchRepo() as repo:
+            repo.write_run(self.ECHO_RUN)
+            repo.write(
+                "tests/lab3/manifest.json",
+                '{"ext": ".src", "mode": "inline", "expect_prefix": "espérable:"}',
+            )
+            repo.write("tests/lab3/a.src", "ok  // espérable: ok\n")
+            result = repo.run_harness("tests/lab3")
+        self.assertNotIn("Traceback", result.stdout + result.stderr)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+
+class TimeoutTests(unittest.TestCase):
+    """
+    A runaway test has to be killed outright, not just let go of.
+
+    Killing only the process the harness started leaves anything it spawned
+    still holding the output pipe, and reading that pipe is what the harness
+    does next, so it waits forever. On Windows that is the normal shape of a
+    run: the entrypoint is a shell script, so bash is the child and the
+    interpreter is the grandchild.
+
+    An infinite loop in a group's test then hangs grading instead of failing
+    it, which is a worse outcome than any wrong answer.
+    """
+
+    # A child that outlives its parent and keeps stdout open, which is exactly
+    # what a shell entrypoint plus a real interpreter looks like.
+    ORPHAN_MAKER = (
+        "#!/usr/bin/env python3\n"
+        "import subprocess, sys, time\n"
+        "subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(300)'])\n"
+        "time.sleep(300)\n"
+    )
+
+    def test_a_runaway_grandchild_does_not_hang_the_harness(self):
+        with ScratchRepo() as repo:
+            repo.write_run(self.ORPHAN_MAKER)
+            repo.write("tests/lab0/runaway.src", "")
+            repo.write("tests/lab0/runaway.expected", "")
+            started = time.monotonic()
+            try:
+                result = repo.run_harness("tests/lab0")
+            except subprocess.TimeoutExpired:
+                self.fail("the harness hung instead of timing the test out")
+            elapsed = time.monotonic() - started
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("TIMEOUT", result.stdout)
+        # The limit is 15 seconds. Anything near a minute means it waited for
+        # the orphan rather than killing it.
+        self.assertLess(elapsed, 60, "the timeout did not take effect promptly")
 
 
 class UnknownManifestKeyTests(unittest.TestCase):
