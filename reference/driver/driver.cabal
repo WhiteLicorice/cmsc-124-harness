@@ -1,0 +1,41 @@
+cabal-version:      3.0
+name:               cmsc124-ref
+version:            1.0.0
+synopsis:           The CMSC 124 reference implementation, built on xolsh
+description:
+  A thin command line front end over the xolsh interpreter library, exposing the
+  four pipeline stages the CMSC 124 laboratory activities ask groups for. It
+  exists so the test harness can be proven against a real language rather than
+  against stand-in scripts.
+
+license:            BSD-3-Clause
+author:             Rene Andre Bedonia Jocsing
+build-type:         Simple
+
+executable cmsc124-ref
+  main-is:          Main.hs
+  hs-source-dirs:   app
+  other-modules:    CmdlineOptions
+  default-language: GHC2021
+
+  default-extensions:
+    LambdaCase
+    OverloadedRecordDot
+    OverloadedStrings
+
+  ghc-options:
+    -Wall
+    -Wcompat
+    -Wincomplete-record-updates
+    -Wincomplete-uni-patterns
+    -Wredundant-constraints
+    -threaded
+    -rtsopts
+
+  build-depends:
+    , base                  >=4.7 && <5
+    , bluefin               >=0.2.3 && <1
+    , bytestring
+    , optparse-applicative
+    , vector
+    , xolsh

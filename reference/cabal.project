@@ -1,0 +1,20 @@
+-- The reference implementation: xolsh's interpreter library plus the thin
+-- driver that puts the course's four stages on top of it.
+--
+-- xolsh ships its own cabal.project, which also builds its WebAssembly front
+-- end and pulls a git dependency for it. None of that is needed here, and
+-- cabal.project files do not nest, so listing the package directory picks up
+-- xolsh.cabal alone.
+
+packages:
+  xolsh/
+  driver/
+
+-- Pinned so a build in six months resolves the same dependency versions a
+-- build today does. This is the index-state xolsh itself pins.
+index-state: hackage.haskell.org 2025-12-21T23:36:02Z
+
+-- The interpreter under test is not the thing being profiled, and these
+-- warnings are xolsh's business, not ours.
+package xolsh
+  ghc-options: -w

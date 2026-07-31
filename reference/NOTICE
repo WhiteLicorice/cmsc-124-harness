@@ -1,0 +1,39 @@
+The reference implementation and its test corpus are built from two other
+people's work. Both are used under permissive licenses, and both are named here
+with the exact version they were taken from.
+
+-------------------------------------------------------------------------------
+
+xolsh, a Lox interpreter written in Haskell
+  Copyright (c) 2023 0rphee
+  https://github.com/0rphee/xolsh
+  BSD 3-Clause License, reproduced in reference/xolsh/LICENSE
+
+Vendored as the git submodule at reference/xolsh, from the fork at
+https://github.com/WhiteLicorice/xolsh. The fork differs from upstream in one
+commit, which deletes .gitmodules and its three gitlinks: one of them uses an
+SSH URL, which makes a recursive clone of this repository fail for anyone
+without a key on that host.
+
+No other change was made to it. The pipeline stages in reference/driver are a
+separate package that imports xolsh as a library, so xolsh's own source stays
+exactly as its author wrote it.
+
+-------------------------------------------------------------------------------
+
+The Lox test corpus
+  Copyright (c) 2015 Robert Nystrom
+  https://github.com/munificent/craftinginterpreters
+  MIT License, which covers the .lox files used here. The book's prose, which
+  is licensed separately and more restrictively, is not used.
+
+Taken from commit 4a840f70f69c6ddd17cfef4f6964f8e1bcd8c3d4 (2024-08-01).
+
+Most of the files under reference/tests/lab3, lab4, and lab5 started life in
+that corpus. They were bucketed by feature, filtered down to what this course
+actually covers, and rewritten into this harness's annotation vocabulary by
+reference/tools/adapt_corpus.py, which documents each transformation. Every
+resulting expectation was then checked against the built reference rather than
+trusted from upstream.
+
+The files under reference/tests/lab0, lab1, and lab2 are original.

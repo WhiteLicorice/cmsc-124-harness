@@ -1,0 +1,16 @@
+# The reference binary, built by reference/build.sh. Thirty megabytes of
+# platform-specific Haskell output has no business in a repository whose whole
+# point is that groups can fetch one small file from it.
+reference/bin/
+
+# cabal's build tree, if it lands next to the source rather than in the
+# space-free directory build.sh picks on Windows.
+dist-newstyle/
+
+# Scratch copies the mutation tests make inside reference/, so that ./run stays
+# reachable from the repo root they are graded against. They clean up after
+# themselves; this is for the runs that get interrupted.
+reference/.mutation-*/
+
+__pycache__/
+*.pyc
