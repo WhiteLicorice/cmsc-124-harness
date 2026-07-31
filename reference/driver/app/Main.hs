@@ -109,9 +109,9 @@ expressionsOnly = traverse unwrap
       Stmt.SExpression expression -> Right expression
       other ->
         Left $
-          "This stage evaluates expressions, one per line, and found a "
+          "This stage takes a file of expressions, one per line, and found a "
+            <> "statement instead: "
             <> BS.pack (Stmt.getType other)
-            <> " instead."
 
 reject :: (io :> es) => IOE io -> ByteString -> Eff es ()
 reject io message = do
